@@ -108,3 +108,17 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Contribution: implemented explicit sqlite3 transaction mode and per-connection foreign keys, wrote five file-backed behavior tests, and updated ADR/progress/evidence. Used PowerShell, Git, uv, pytest, Ruff, and official SQLAlchemy SQLite documentation.
 - Actual verification: 16 persistence tests and 67 total tests passed; final Ruff lint/format, lock, and dependency checks passed. An initial lint finding was corrected. Exact commands and observed results are in the build log.
 - Review/limits: assistant inspected code and output; human review/acceptance and work duration are not recorded. Tests cover temporary SQLite probe schemas, not business models or operational migrations. No normal database was touched, no commit/push. Step 4 remains user-gated.
+
+## 2026-10-29 - Phase 02, Step 4: users, roles, and applications
+
+- Task/scope: user authorized Step 4 only. Assistant inspected clean `0add25c`, persistence foundation, requirements, architecture, and current records. No subagents or product-model calls were used.
+- Contribution: authored user, role-membership, application, and UTC datetime models; six database-backed model tests; and the associated ADR/progress/evidence updates. Used PowerShell, Git, uv, pytest, Ruff, and SQLAlchemy's installed API.
+- Actual verification: model suite **6 passed** and persistence suite **22 passed**. Initial tests exposed SQLite timezone round-trip loss and SQLAlchemy enum parameter validation; implementation/test changes made the storage behavior explicit and verified the database enum check. Exact final commands/results are in the build log.
+- Review/limits: assistant inspected source and observed outputs; human review/acceptance and work duration are not recorded. No migration, seed, normal database, business endpoint, permission service, or self-review control was added. No commit/push. Step 5 remains user-gated.
+
+## 2026-10-29 - Phase 02, Step 5: logical requests and versions
+
+- Task/scope: user authorized Step 5 only. Assistant inspected the dirty worktree and preserved uncommitted Step 4 changes. No subagents or product-model calls were used.
+- Contribution: authored request/version ORM models, current-version relationship constraint, ORM immutability guard, ten isolated file-backed tests, and progress/decision records. Used PowerShell, Git, uv, pytest, Ruff, and installed SQLAlchemy.
+- Actual verification: focused version suite **10 passed**, full suite **83 passed**; final Ruff lint/format and lock/dependency checks passed. Initial helper ordering and detached-instance test failures were corrected. Exact commands and limits appear in the build log.
+- Review/limits: assistant inspected source and outputs; human review/acceptance and work duration are not recorded. Direct SQL immutability, decision/history schema, migration, seeds, and business operations remain pending. No normal database, commit, or push. Step 6 remains user-gated.

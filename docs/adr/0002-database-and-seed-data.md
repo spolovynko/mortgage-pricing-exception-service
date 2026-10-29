@@ -2,15 +2,15 @@
 
 - Date: 2026-10-29 (Europe/Brussels).
 - Phase / milestone: 02 / MVP1.
-- Status: Implemented through execution Step 3 only; Phase 02 remains in progress.
-- Implementation state: partial; SQLite connection/transaction configuration verified, business storage not yet implemented.
+- Status: Implemented through execution Step 5 only; Phase 02 remains in progress.
+- Implementation state: partial; SQLite configuration and user/application/request/version models verified.
 - Decision owner or contributor: Codex assistant within the user's incremental Phase 02 requests.
 - Human acceptance: not recorded for the resulting implementation.
 - Related requirements and phase guide: NFR-01/03, DEL-02/03; [Phase 02](../phases/phase-02-database-and-seed-data.md).
 
 ## Context
 
-Step 1 verified the Phase 01 baseline. Step 2 began from clean `main` at `54e219e`, with the Step 1 records committed. The user authorized the persistence foundation only. SQLite driver transaction configuration is Step 3; business models are Steps 4-7, atomic operation checks Step 8, migrations Step 9, seeds Step 10, and API/database readiness wiring Step 11.
+Step 1 verified the Phase 01 baseline. Step 2 began from clean `main` at `54e219e`, with the Step 1 records committed. The user authorized each later step separately. Steps 3-4 add SQLite transaction guarantees and the first business models; request/version/decision/history models remain Steps 5-7, atomic operation checks Step 8, migrations Step 9, seeds Step 10, and API/database readiness wiring Step 11.
 
 The project already uses immutable central settings, explicit application factories, safe JSON diagnostics, and shared HTTP error handling. Persistence should fit those boundaries. The agreed stack is SQLite through SQLAlchemy, with Alembic for schema evolution.
 
@@ -35,6 +35,9 @@ The project already uses immutable central settings, explicit application factor
 - Create `create_session_factory(engine)` returning SQLAlchemy's standard `sessionmaker`. Retain normal expiration after commit. Use `with factory.begin() as session` for commit on success, rollback on failure, and session closure. Plain `with factory()` closes without implicitly committing.
 - The engine owner must close sessions/connections before calling `engine.dispose()`. Current tests own this lifecycle. API construction/shutdown wiring belongs to Step 11, when the API first owns a database resource; `main.py` is unchanged in Step 2.
 - Step 3 uses Python 3.12+ sqlite3 `autocommit=False` so SELECT, DDL, and savepoints participate in explicit transactions. An engine-local listener sets `PRAGMA foreign_keys=ON` on every DBAPI connection, temporarily enabling autocommit solely for that PRAGMA. Keep the configured busy timeout; a lock failure rolls back the attempted operation and leaves retry policy to a future business boundary. Do not enable WAL or automatic retry without a concrete workload and verification need.
+- Step 4 uses UUID primary keys for internal users and mortgage applications, unique nonblank technical identifiers, and UTC-normalized timestamps that restore timezone information after SQLite reads. Users hold roles through a membership table, allowing a future user to hold both current roles. Applications reference their manager through a composite foreign key to a `relationship_manager` membership; a reviewer-only user cannot own an application. This added `manager_role` column is a fixed relational guard for that composite reference, constrained to `relationship_manager`; it is not an API input. Later services still enforce actor permissions and self-review rules.
+- Step 5 stores one `PricingRequest` per application through a unique application foreign key. `RequestVersion` has a composite `(request_id, version_number)` primary key, positive integer basis-point discount, reason length 1-2,000 after trimming, existing submitter reference, and UTC submission time. The request's nullable `current_version_number` uses a composite foreign key `(id, current_version_number)` to the version's key, preventing a pointer to another request. A new request is inserted before its first version; the pointer is set after the version exists in the same transaction. Operation-level atomicity and competing updates remain Step 8 work.
+- The ORM rejects updates and deletion of submitted versions with mapper events. This protects ordinary ORM code, while direct SQL and bulk statements can bypass it. Step 9 migration must add database triggers to reject changes to stored version rows. There is no claim of database-level immutability until that is verified. No status is stored on versions yet: a version without a Step 6 decision is pending, and only the current version will be eligible for approved-pricing retrieval.
 - Add ignore rules for local `data/`, SQLite database files, and journal/WAL/shared-memory sidecars. No real settings, normal database, or existing data directory is opened or removed.
 
 ## Consequences
@@ -45,7 +48,7 @@ The common persistence boundary is available for later steps without adding busi
 
 Step 3 configures Python 3.12+ sqlite3 with `autocommit=False`, rather than relying on the driver's legacy mode. An engine-local connection listener temporarily enables autocommit to run `PRAGMA foreign_keys=ON`, then restores the prior value. This applies to every pooled DBAPI connection before use and does not introduce import-time I/O. A short busy timeout still raises a lock error under contention; callers must end the failed transaction and choose whether a later retry is valid. Journal mode remains SQLite's default; no automatic retry or cross-process update protocol is claimed. Keep business write transactions short, and establish operation-level competing-update rules in Step 8.
 
-Five isolated file-backed tests establish FK rejection on two connections, DDL rollback without prior DML, nested savepoint rollback, released savepoint participation in outer rollback, and bounded writer contention/recovery. The Step 3 scoped persistence suite passed 16 tests; the full suite passed 67. Business schema, migrations, seeds, and API integration remain pending.
+Five isolated file-backed tests establish FK rejection on two connections, DDL rollback without prior DML, nested savepoint rollback, released savepoint participation in outer rollback, and bounded writer contention/recovery. Six Step 4 model tests establish user/application persistence and database constraints. Business request/version/decision/history schema, migrations, seeds, and API integration remain pending.
 
 Only tests create a simple probe table in pytest-owned temporary files. Application code does not create a schema. Operational schema setup must use Alembic in Step 9. The absence of a data directory will produce a storage error on connection; no implicit filesystem setup occurs here.
 

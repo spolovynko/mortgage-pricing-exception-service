@@ -1,9 +1,9 @@
 # Phase 02 - Database and seed data
 
-- Status: In progress; execution Steps 1-3 complete. Step 4 requires the user's instruction.
+- Status: In progress; execution Steps 1-5 complete. Step 6 requires the user's instruction.
 - Milestone: MVP1.
 - Prerequisite: Phase 01 complete or its unmet criteria explicitly resolved.
-- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 3 only.
+- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 5 only.
 - Handoff to create: `docs/handoffs/phase-02.md`.
 
 ## Objective
@@ -25,8 +25,8 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 1. [x] Confirm the Phase 01 baseline and persistence boundaries.
 2. [x] Add the persistence foundation.
 3. [x] Configure and verify SQLite transactions.
-4. [ ] Define users, roles, mortgage applications, and manager ownership.
-5. [ ] Define logical requests and immutable submitted versions.
+4. [x] Define users, roles, mortgage applications, and manager ownership.
+5. [x] Define logical requests and immutable submitted versions.
 6. [ ] Define decisions and append-only history.
 7. [ ] Define caller-scoped idempotency records.
 8. [ ] Define and verify atomic operation boundaries.
@@ -67,9 +67,26 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - The writer test establishes a bounded lock error and manual retry after release; it does not claim automatic retry, multi-process safety, or a complete competing-update protocol. Business models, migrations, seeds, and API readiness remain pending. The session/SQLite configuration task is checked; atomic business operation boundaries remain unchecked until Step 8. No phase acceptance criterion is complete.
 - Next action: Step 4 only on user instruction.
 
+### Step 4 evidence - 2026-10-29
+
+- Began from clean `main` at `0add25c`, after the user committed Step 3. Added ORM models for internal users, role memberships, and mortgage applications. No migration, seed, API endpoint, business operation, or normal database was created.
+- A user has a stable UUID, a unique nonblank login, a display name, timezone-aware UTC creation time, and zero or more role memberships. Memberships are unique by user/role and allow the two current roles: `relationship_manager` and `reviewer`.
+- An application has a UUID, unique nonblank reference, creation time, and one manager. Its composite foreign key requires that owner to hold `relationship_manager`; a reviewer-only user cannot own an application. Later service operations still enforce who may submit/revise and who may decide; this schema does not implement API authorization.
+- `uv run --locked python -m pytest tests/persistence/test_models.py -q`: **6 passed**. `uv run --locked python -m pytest tests/persistence -q`: **22 passed**. Full-suite and static-check results are recorded in the build log.
+- Tests use `Base.metadata.create_all()` only in pytest-owned temporary SQLite files. They verify persistence/reopen, role membership, manager ownership, unique login/reference/membership, missing/reviewer-only manager failures, invalid role failure, and blank identifier failures. The schema will first be operationally created by Step 9 Alembic migration.
+- Next action: Step 5 only on user instruction. The broader request/version/decision/history constraint task remains unchecked, and no phase acceptance criterion is complete.
+
+### Step 5 evidence - 2026-10-29
+
+- Began with Step 4 changes still uncommitted and preserved them. Added `PricingRequest` with one row per application, and `RequestVersion` with a request-scoped positive number, positive integer discount in basis points, nonblank reason of at most 2,000 characters, submitter reference, and UTC submission time.
+- `current_version_number` is a nullable pointer on the logical request. A composite foreign key requires it to identify a version belonging to that request. Creation inserts the request, then its first version, then sets the pointer in one transaction; Step 8 will define the application operation and its concurrency rules. The temporary null state is needed for this insertion order.
+- ORM update/delete events reject modification of submitted versions. Direct SQL can bypass these events; Step 9 must add SQLite triggers for stored-row immutability. No API operation or claim of database-level append-only protection is made yet.
+- Ten isolated file-backed tests cover two preserved versions and the current pointer, duplicate request/version rejection, wrong or absent current version rejection, invalid or overlong terms, missing submitter, and ORM edit/delete rejection. `uv run --locked python -m pytest tests/persistence/test_request_versions.py -q`: **10 passed**. Full suite: **83 passed**; Ruff lint/format, lock and dependency checks passed. The build log records exact commands and corrections.
+- Request/version/decision/history combined task and whole-phase acceptance criteria remain unchecked until their later work is complete. No migration, seed, normal database, or business endpoint was created. Next action: Step 6 only on user instruction.
+
 ## Implementation tasks
 
-- [ ] Define users/role membership and mortgage applications with a documented manager-ownership relationship.
+- [x] Define users/role membership and mortgage applications with a documented manager-ownership relationship.
 - [ ] Define a logical request unique per application, submitted versions, current-version reference, decisions, and history events.
 - [ ] Define caller-scoped idempotency storage: key, canonical input fingerprint, and the original creation result/reference.
 - [ ] Decide how exact version input and actor/time metadata are preserved through application operations.
