@@ -1,6 +1,6 @@
 # Phase 01 - Foundation, configuration, and logging
 
-- Status: In progress (Steps 2-6 verified, including structured logging and correlation; phase incomplete).
+- Status: In progress (Steps 2-7 verified; final phase verification and handoff pending).
 - Milestone: MVP1.
 - Prerequisite: documentation scaffold; inspect actual repository state.
 - Primary ADR to create: `docs/adr/0001-foundation-config-logging.md`.
@@ -27,8 +27,8 @@ Establish the installable `mortgage_pricing` package under src/, tests/, UI entr
 - [x] Add central Pydantic Settings and .env.example. Cover application environment, log level, database URL, demo identity mode, UI API address, and reserved AI settings.
 - [x] Define `LLM_MODE=off|auto`: auto permits later capability discovery, not automatic inference. No live AI is needed in this phase.
 - [x] Add JSON logging with timestamp, severity, event, correlation_id, outcome, and duration; domain IDs are added when available.
-- [ ] Bound/validate supplied correlation identifiers, return the operation identifier to callers, and avoid raw body/secret logging. Step 6 covers handled responses and safe request logs; unhandled 500 response correlation remains Step 7 work.
-- [ ] Establish a consistent error envelope. Unexpected failures receive a safe response and useful server-side diagnostics.
+- [x] Bound/validate supplied correlation identifiers, return the operation identifier to callers, and avoid raw body/secret logging. Step 7 includes unexpected 500 responses before response start.
+- [x] Establish a consistent error envelope. Unexpected failures receive a safe response and useful server-side diagnostics.
 - [ ] Create a minimal UI entry point if helpful, labelled as a scaffold rather than a working request workflow.
 - [x] Establish formatting/lint and test commands; document dependency installation before showing runnable commands.
 
@@ -56,6 +56,12 @@ Added standard-library JSON logging, independent per-app handlers/levels, and pu
 
 Observed: `uv run --locked python -m pytest` -> **28 passed** (14 logging cases). Ruff lint/format, lock consistency (28 packages), and installed-dependency checks passed. Live Uvicorn using `--log-config config/logging.json --no-access-log` returned 200 `/health` and 404 `/missing?token=synthetic-secret` with matching response/log IDs (`live-success`/`live-failure`), correct outcome/severity, and no query secret in logs. The server was stopped afterward. Error envelopes and complete phase acceptance/handoff remain pending.
 
+### Step 7 - safe, consistent errors (2026-10-29)
+
+Added `errors.py` for the common error/correlation envelope and HTTP/validation handlers. HTTP status/standard headers are preserved, while exception details and validation inputs are excluded. Unexpected exceptions are logged once and answered with a generic 500 inside the existing request boundary, retaining correlation. Already-started response failures are logged/rethrown without attempting a replacement response. Twelve new error tests cover framework/HTTP errors, invalid and malformed input, safe 500s, correlation/recovery, stream failure, and invalid app configuration.
+
+Observed: full pytest **40 passed**; Ruff lint/format, lock consistency (28 packages), and dependency checks passed. Live Uvicorn with a temporary in-memory test route returned 200 and generic 500; response body/header/log IDs matched, the failure logged once, and the synthetic exception message was absent. The temporary server was stopped; no failure route was added to application source. Windows/CPython 3.12.12 only. Final fresh-environment verification and phase handoff remain pending.
+
 Test settings defaults, environment overrides, invalid values, isolated test settings, health responses, correlation propagation, and safe error/log behaviour. Tests must not require a real database, Docker, an external network, or a model.
 
 Use the actual supported commands. Expected forms after installation include `python -m pytest` and `python -m ruff check .`; configure them before claiming they work. Manually start the minimal API and inspect one success and one failure log.
@@ -63,10 +69,10 @@ Use the actual supported commands. Expected forms after installation include `py
 ## Acceptance criteria
 
 - [ ] A documented fresh local environment can install and run the minimal API.
-- [ ] Invalid configuration fails clearly before normal operation.
-- [ ] Repeated application/test creation does not accumulate handlers or share mutable request state.
-- [ ] Health and error responses are consistent and traceable in logs.
-- [ ] Relevant tests and lint checks pass with observed evidence.
+- [x] Invalid configuration fails clearly before normal operation. Tested at application creation in Step 7.
+- [x] Repeated application/test creation does not accumulate handlers or share mutable request state. Step 6 handler/context isolation tests pass.
+- [x] Health and error responses are consistent and traceable in logs. Steps 6-7 automated and live verification passed.
+- [x] Relevant tests and lint checks pass with observed evidence. Step 7: 40 passed; Ruff lint/format passed.
 - [ ] No business/AI/container capability is falsely claimed as implemented.
 
 ## Decision record and handover

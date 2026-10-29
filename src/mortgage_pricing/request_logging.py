@@ -8,6 +8,7 @@ from uuid import uuid4
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
+from mortgage_pricing.errors import internal_error_response
 from mortgage_pricing.logging_config import correlation_id
 
 _CORRELATION_ID = re.compile(rb"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
@@ -33,10 +34,12 @@ class RequestLoggingMiddleware:
         token = correlation_id.set(identifier)
         started = perf_counter()
         status_code = 500
+        response_started = False
 
         async def send_response(message: Message) -> None:
-            nonlocal status_code
+            nonlocal status_code, response_started
             if message["type"] == "http.response.start":
+                response_started = True
                 status_code = message["status"]
                 MutableHeaders(scope=message)["X-Correlation-ID"] = identifier
             await send(message)
@@ -57,7 +60,10 @@ class RequestLoggingMiddleware:
             details = metadata()
             details["outcome"] = "failure"
             self.logger.exception("request_failed", extra=details)
-            raise
+            if response_started:
+                # A stream/background failure cannot replace headers or a response already sent.
+                raise
+            await internal_error_response(identifier)(scope, receive, send_response)
         else:
             level = (
                 logging.ERROR

@@ -4,7 +4,7 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 ## Current state
 
-Phase 01 is in progress. Steps 2-6 supply the Python package and development tools, validated configuration, a minimal health API, and structured request logging with correlation IDs. Consistent error responses, business endpoints, UI, containers, and model integration remain pending.
+Phase 01 is in progress. Steps 2-7 supply the Python package and development tools, validated configuration, a minimal health API, structured request logging, and safe correlated error responses. Final phase verification and handoff remain pending; business endpoints, UI, containers, and model integration belong to later phases.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -77,15 +77,27 @@ Application logs go to stdout as JSON with UTC `timestamp`, `level`, `event`, `c
 
 Send an optional `X-Correlation-ID` header: one value of 1-64 ASCII letters, digits, dots, underscores, or hyphens, starting with a letter or digit. Missing, invalid, and duplicate values receive a generated UUID. The ID is returned in the response header and applied to logs during that request. For example, `Invoke-WebRequest http://127.0.0.1:8000/health -Headers @{'X-Correlation-ID'='demo-123'}` produces a matching response header and request log.
 
-Logs include metadata rather than bodies, query strings, headers, or raw unknown paths. Exception diagnostics include type and stack locations, excluding messages and source text. Use fixed internal event names when adding application logging. Correlation IDs do not establish identity or permission. Unhandled exceptions are logged and rethrown; their consistent HTTP response and correlation header are Step 7 work.
+Logs include metadata rather than bodies, query strings, headers, or raw unknown paths. Exception diagnostics include type and stack locations, excluding messages and source text. Use fixed internal event names when adding application logging. Correlation IDs do not establish identity or permission. Unexpected failures before response headers are sent receive the safe response below; failures during an already-started response are logged and rethrown.
 
 Run the logging tests with `uv run --locked python -m pytest tests/test_logging.py`.
+
+## Error responses (Step 7)
+
+`errors.py` owns the shared envelope and framework handlers. HTTP errors use stable codes derived from status names (for example, `not_found` or `method_not_allowed`) and standard status phrases. Invalid input receives 422 with code `validation_error`; input values and validation internals are excluded. Expected HTTP exceptions preserve status and headers such as `Allow`, `Retry-After`, and `WWW-Authenticate`, while their detail payloads are hidden. Later business errors will define their own reviewed contracts.
+
+Unexpected exceptions before response start receive HTTP 500:
+
+```json
+{"error":{"code":"internal_error","message":"An unexpected error occurred."},"correlation_id":"demo-123"}
+```
+
+The same ID appears in `X-Correlation-ID` and the failure log. The request boundary logs the diagnostic once and sends the safe response. HTTP exceptions with 5xx status also receive a generic internal-error message. Already-started streams/background failures cannot replace a response; they are logged and rethrown. Run `uv run --locked python -m pytest tests/test_errors.py` to verify the error contract.
 
 ## Continue implementation
 
 1. Read [project status](docs/project-status.md).
 2. Read [requirements](docs/requirements.md) and the [implementation plan](docs/implementation-plan.md).
-3. Continue [Phase 01](docs/phases/phase-01-foundation-config-logging.md) one agreed step at a time. Step 7 (consistent, safe errors) is next.
+3. Continue [Phase 01](docs/phases/phase-01-foundation-config-logging.md) with final verification and completion records when requested.
 4. Have the agent read [AGENTS.md](AGENTS.md) before implementing that phase.
 
 Suggested phase-chat prompt:

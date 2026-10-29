@@ -2,9 +2,9 @@
 
 - Date: 2026-10-29 (Europe/Brussels).
 - Phase / milestone: 01 / MVP1.
-- Status: Implemented for Steps 2-6, including JSON logging and request correlation.
-- Implementation state: partial phase; consistent HTTP error responses and unhandled 500 correlation headers remain pending.
-- Decision owner or contributor: Codex assistant within the user's separate incremental Step 2-6 requests.
+- Status: Implemented for Steps 2-7, including logging, correlation, and safe HTTP errors.
+- Implementation state: foundation behavior implemented; final phase verification and handoff remain pending.
+- Decision owner or contributor: Codex assistant within the user's separate incremental Step 2-7 requests.
 - Human acceptance: not recorded for the resulting implementation.
 - Related requirements and phase guide: NFR-01, NFR-03, DEL-01/02/03; [Phase 01](../phases/phase-01-foundation-config-logging.md).
 
@@ -19,6 +19,8 @@ Step 4 was then requested with a clean worktree following the Step 3 commit `986
 Step 5 was requested with a clean worktree after Step 4 had been committed as `2ceb97e`. It authorizes the minimal API factory and process health endpoint. Structured logging and error behavior remain deferred.
 
 Step 6 was requested after Step 5 commit `5b8ed82`, with a clean working tree. Logging and request tracing are authorized; consistent HTTP error responses remain Step 7 work.
+
+Step 7 was requested after Step 6 commit `2f691b5`, with a clean working tree. Its scope is a consistent HTTP error contract and safe unexpected-failure handling. The optional middleware directory refactor was discussed but has not been applied in this increment.
 
 ## Options considered
 
@@ -44,11 +46,13 @@ Use standard-library logging with a JSON formatter and one independently owned l
 
 The schema contains UTC timestamp, level, trusted internal event name, correlation_id, outcome, and duration in seconds. Request metadata is restricted to method, matched route template, and HTTP status; optional actor/request/version IDs can be supplied later. Use INFO for success, WARNING for 4xx, ERROR for 5xx/exceptions. Non-request events have null correlation/outcome/duration. Application `LOG_LEVEL` filters these records. Exception diagnostics contain type and stack file/function/line, excluding exception messages, source text, and local values. Extra fields are allowlisted; callers must use fixed internal event names and avoid placing user input in the event string.
 
-Accept one `X-Correlation-ID` containing 1-64 ASCII letters/digits/dots/underscores/hyphens, beginning with a letter/digit. Generate UUIDs for missing, invalid, or duplicate inputs instead of rejecting an otherwise valid operation. Caller IDs are tracing hints, never identity or authorization. Store the ID in request state and return it in handled response headers. Log escaping uses JSON serialization. Unknown paths, queries, bodies, headers, and settings are excluded. Unhandled failures are logged and rethrown; the outer Starlette error boundary generates their responses, so Step 7 must attach their response ID and safe envelope.
+Accept one `X-Correlation-ID` containing 1-64 ASCII letters/digits/dots/underscores/hyphens, beginning with a letter/digit. Generate UUIDs for missing, invalid, or duplicate inputs instead of rejecting an otherwise valid operation. Caller IDs are tracing hints, never identity or authorization. Store the ID in request state and return it in response headers. Log escaping uses JSON serialization. Unknown paths, queries, bodies, headers, and settings are excluded. Step 7 extends the request boundary to send a safe correlated 500 for unexpected failures before response start.
 
 Use `config/logging.json` only at the Uvicorn command boundary to apply the same formatter to server logs. Disable its separate raw access log with `--no-access-log`, keeping one application completion event per request. Uvicorn lifecycle/error events remain distinct server diagnostics, with null correlation when emitted outside a request context. Do not configure global server loggers in `create_app`.
 
-Consistent HTTP errors, runtime demo identity behavior, and UI implementation remain pending. No business policy changed.
+Centralize response models and builders in `errors.py`. HTTP/validation handlers reuse `{error: {code, message}, correlation_id}` and preserve status and supplied HTTP headers. HTTP errors use lower-case HTTPStatus names and standard phrases; unknown nonstandard statuses use `http_error`. Validation failures use `validation_error` and a generic message, deliberately excluding input values, custom messages, and field names that can contain request data. HTTP 5xx errors use `internal_error` and a generic message. Later domain-specific contracts belong to Phase 03.
+
+Handle unexpected exceptions inside the existing tracing boundary, where the correlation context and timing are available. Log once using safe diagnostics, send generic HTTP 500, and reset the context. This avoids relying on the outer server error middleware, which otherwise rethrows after sending and can duplicate logs. Do not catch cancellation/system-exit exceptions. If headers are already sent (stream/background failure), log and rethrow without sending a second response. Tests cover that limitation explicitly. Runtime demo identity behavior and UI implementation remain later-phase work. No business policy changed.
 
 ## Consequences
 
@@ -92,6 +96,12 @@ The package imports through an isolated virtual environment and normal setup reu
 - Ruff lint/format, `uv lock --check` (28 packages), and `uv pip check` passed. Dependencies were unchanged.
 - Live Uvicorn with `--log-config config/logging.json --no-access-log` produced JSON startup and request logs. `/health` returned 200 with `live-success`; `/missing?token=synthetic-secret` returned 404 with `live-failure`. Log IDs matched response headers, severity/outcome/duration were correct, and the query secret was absent. The server was stopped afterward.
 - Limits: Windows/CPython 3.12.12 only. Unhandled failures have safe operational diagnostics, but their HTTP response envelope and correlation header await Step 7. No business/database/model/container behavior or human acceptance is claimed. Phase 01 remains incomplete.
+
+### Step 7 evidence
+
+- Full pytest: **40 passed**, including 12 error cases covering 404/405, HTTP exception details/headers, invalid/malformed JSON, safe unexpected failures, correlation/recovery, failures after response start, and invalid settings at app creation. Ruff lint/format, lock consistency (28 packages), and installed-dependency checks passed. A long test comment was corrected after the initial lint check; no warning rules were relaxed.
+- Live local Uvicorn ran the real app with a temporary stdin-only failure route. `/health` returned 200 with `step7-success`; the synthetic failure returned generic 500 with `step7-failure` in both body/header and its single diagnostic record. The synthetic exception message was absent. Server stopped; the failure route was not added to application source.
+- Limits: Windows/CPython 3.12.12 only; no business/database/model/container verification or human acceptance. Failures after response start cannot replace the response. Phase remains in progress pending fresh-environment verification and handoff.
 
 ## Alternatives rejected and revisit conditions
 

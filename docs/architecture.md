@@ -1,8 +1,8 @@
 # Proposed architecture
 
-Status: Packaging, configuration, health API, structured logging, and request correlation implemented; broader application architecture remains a design baseline. Update this document as phases complete. Use ADRs for the rationale behind decisions.
+Status: Packaging, configuration, health API, structured logging, request correlation, and safe HTTP errors implemented; broader application architecture remains a design baseline. Update this document as phases complete. Use ADRs for the rationale behind decisions.
 
-Phase 01 progress (2026-10-29): packaging, Python 3.12/uv setup, configuration, `/health`, and request tracing are implemented. Business components, readiness probes, and consistent error responses remain planned. See [ADR 0001](adr/0001-foundation-config-logging.md).
+Phase 01 progress (2026-10-29): packaging, Python 3.12/uv setup, configuration, `/health`, request tracing, and safe error responses are implemented. Business components and dependency readiness probes remain planned; phase completion verification/handoff remains pending. See [ADR 0001](adr/0001-foundation-config-logging.md).
 
 ## Components and boundaries
 
@@ -84,7 +84,9 @@ The UI toggle is local to the reviewer's session. Off prevents new calls and doe
 
 Operational JSON logs go to stdout/stderr with bounded container retention. Keep correlation identifiers distinct from pricing-request IDs. Persist business history in the database. Core liveness, database readiness, and AI availability are distinct signals; a model failure must not create core restart loops.
 
-Step 6 implements stdout JSON logging with one independent logger per app and a ContextVar for request correlation. ASGI middleware validates a single 1-64 character ASCII `X-Correlation-ID` (letter/digit first; then letters/digits/dot/underscore/hyphen), generates UUIDs for other inputs, and returns the ID on handled responses. Request logs contain method, matched route template, status, outcome, and duration in seconds; arbitrary request data and exception messages are excluded. Uvicorn uses the shared formatter via `config/logging.json`; the documented command disables its raw access log. Consistent error responses and correlation headers on unhandled 500s remain Step 7 work. See ADR 0001 for diagnostics and isolation decisions.
+Step 6 implements stdout JSON logging with one independent logger per app and a ContextVar for request correlation. ASGI middleware validates a single 1-64 character ASCII `X-Correlation-ID` (letter/digit first; then letters/digits/dot/underscore/hyphen), generates UUIDs for other inputs, and returns the ID on responses. Request logs contain method, matched route template, status, outcome, and duration in seconds; arbitrary request data and exception messages are excluded. Uvicorn uses the shared formatter via `config/logging.json`; the documented command disables its raw access log. See ADR 0001 for diagnostics and isolation decisions.
+
+Step 7 centralizes the error envelope and HTTP/validation handlers in `errors.py`. Responses contain `error.code`, `error.message`, and `correlation_id`, with the same ID in the header and request log. Validation input and exception detail payloads are excluded. The existing request boundary handles unexpected exceptions before response start, logs once, and sends a generic 500. Failures after response start are logged and rethrown because an existing response cannot be replaced. Domain-specific error contracts are Phase 03 work.
 
 Model calls have timeouts, limited retries, bounded input/output, and clear UI states. Do not hold database transactions while waiting for a model. Persist model identity/digest, prompt/checklist version, request version, timestamps, and outcome. Avoid raw prompt/body logging by default.
 

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from mortgage_pricing.config import Settings, get_settings
+from mortgage_pricing.errors import register_error_handlers
 from mortgage_pricing.logging_config import create_logger
 from mortgage_pricing.request_logging import RequestLoggingMiddleware
 
@@ -22,6 +23,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings if settings is not None else get_settings()
     app.state.logger = create_logger(app.state.settings.log_level)
     app.add_middleware(RequestLoggingMiddleware, logger=app.state.logger)
+    register_error_handlers(app)
 
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     def health() -> HealthResponse:

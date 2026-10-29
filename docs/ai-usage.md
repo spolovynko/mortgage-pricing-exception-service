@@ -73,3 +73,10 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Contribution: selected standard-library JSON logging and pure ASGI middleware, authored code, 14 logging tests, Uvicorn log configuration, README/architecture/ADR/checklist/status updates, and evidence records. Used local PowerShell, Python, Git, uv, pytest, Ruff, and Uvicorn. No subagents or external AI/API calls.
 - Verification: 28 total tests passed; lint/format and lock/dependency checks passed. Live local Uvicorn success/404 requests returned correlation headers matching JSON logs and excluded the synthetic query secret. Exact commands/results and final review are in [build log](build-log.md).
 - Review/limits: assistant reviewed code and output; no human review/acceptance or duration is recorded. HTTP error envelopes and unhandled 500 response correlation remain Step 7 work. No business/database/model/container verification; Windows/CPython 3.12.12 only. Phase incomplete; no commit/push.
+
+## 2026-10-29 - Phase 01, Step 7: safe, consistent HTTP errors
+
+- Task/scope: Step 7 only; inspected clean Step 6 commit `2f691b5` and current code/instructions/records.
+- Contribution: authored `errors.py`, integrated handlers and safe unexpected-error handling into existing tracing, wrote 12 meaningful error tests, and updated README/architecture/ADR/checklist/status/evidence. Used local PowerShell, Python, uv, Git, pytest, Ruff, and Uvicorn; no subagents or external model/API calls.
+- Actual verification: 40 total tests passed; lint/format and dependency/lock checks passed. Live 200/500 requests against a temporary in-memory Uvicorn test route returned safe correlated responses and one diagnostic per failure; synthetic exception message absent. Exact commands and scope are in [build log](build-log.md).
+- Review/limits: assistant inspected outputs; human review/acceptance and work duration not recorded. Already-started responses cannot be replaced. No business/database/model/container checks or phase-completion claim. Fresh-environment verification and handoff remain pending. No commit/push.
