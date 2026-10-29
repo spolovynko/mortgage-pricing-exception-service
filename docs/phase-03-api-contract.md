@@ -1,6 +1,6 @@
 # Phase 03 HTTP contract
 
-This is the contract for the Phase 03 endpoints. The demo lookups and all listed business routes are implemented. All IDs are UUIDs; timestamps are UTC ISO 8601; discounts are positive integer basis points. Request bodies reject unknown fields. Reasons contain 1–2,000 nonblank characters. These limits are technical validation, not bank policy.
+This is the contract for the Phase 03 endpoints, including the additive structured-context extension in [ADR 0010](adr/0010-versioned-request-context.md). The demo lookups and all listed business routes are implemented. All IDs are UUIDs; timestamps are UTC ISO 8601; discounts are positive integer basis points. Request bodies reject unknown fields. Reasons contain 1–2,000 nonblank characters. These limits are technical validation, not bank policy.
 
 Discounts must fit SQLite's positive signed 64-bit range (1–9,223,372,036,854,775,807); this is a storage limit. Reasons preserve exact text and have a 2,000-character raw length limit with nonblank content. Whitespace is not normalized for retry fingerprints. See [ADR 0003](adr/0003-business-rules-and-api.md) and [verification](build-log.md#2026-10-29---phase-03-business-rules-api-and-final-acceptance).
 
@@ -14,17 +14,19 @@ Discounts must fit SQLite's positive signed 64-bit range (1–9,223,372,036,854,
 
 | Route | Input | Success |
 | --- | --- | --- |
-| `POST /requests` | `Idempotency-Key` header (1–128 nonblank characters); `{application_id,discount_bps,reason}` | 201 `{request_id,version_number:1,replayed:false}`; exact caller/key/input retry returns 200 with original IDs and `replayed:true` |
+| `POST /requests` | `Idempotency-Key` header (1–128 nonblank characters); `{application_id,discount_bps,reason,context?}` | 201 `{request_id,version_number:1,replayed:false}`; exact caller/key/input retry returns 200 with original IDs and `replayed:true` |
 | `GET /requests` | Optional `application_id`, `status` (`pending`, `approved`, `declined`) query filters | 200 list sorted by request ID; each summary identifies application, current version, and current status |
 | `GET /requests/{request_id}` | Request UUID | 200 request/application identifiers and current version with exact submitted terms, submitter, time, status, and optional decision |
 | `GET /requests/{request_id}/history` | Request UUID | 200 chronological events ordered by timestamp then event ID; each has version, type, actor, and time, with associated submitted terms/decision where applicable |
-| `POST /requests/{request_id}/revisions` | `{expected_version,discount_bps,reason}` | 201 `{request_id,version_number,replayed:false}`; new current version is pending |
+| `POST /requests/{request_id}/revisions` | `{expected_version,discount_bps,reason,context?}` | 201 `{request_id,version_number,replayed:false}`; new current version is pending |
 | `POST /requests/{request_id}/decisions` | `{expected_version,outcome}` where outcome is `approved` or `declined` | 200 `{request_id,version_number,outcome}`; amount is taken from the stored version |
 | `GET /applications/{application_id}/approved-discount` | Application UUID | 200 `{application_id,status:"approved",request_id,version_number,discount_bps}` or `{application_id,status:"none"}` when the current version lacks approval |
 
+When supplied to create or revision, `context` is a validated object containing `application` fields (`purpose`: `purchase`, `remortgage`, or `product_transfer`; `rate_type`: `fixed`, `variable`, or `tracker`; positive `loan_amount` and `property_value` with at most two decimal places; uppercase three-letter `currency_code`; positive `term_months`; nonnegative `standard_rate_bps`), a `reason_category` (`competitive_offer`, `retention`, `relationship`, or `other`), and optional `competitor_offer` (`rate_bps` and optional ISO `expires_on`). It is a snapshot on that exact request version. Omitted context remains accepted for older clients and is returned as `null`; prior records are not backfilled. Creation retries fingerprint the supplied context as well as application, discount, and exact reason. The UI derives LTV for display from the submitted amounts; LTV is not accepted as an independently editable value.
+
 A new key for an application with a logical request yields 409; revisions must use the revision route. A prior approval remains in history when revised, but the new current version has no usable approved discount until approved.
 
-Listing filters combine with AND; a valid unmatched application filter returns an empty list. Lists are unpaginated. History includes `event_id`, `version_number`, `event_type`, `actor_id`, `actor_login`, `occurred_at`, and a `version` object with exact terms, submitter, UTC time, status, and optional final decision. The version object is associated data, not a snapshot of its status when the event occurred. A current detail also includes application reference; an earlier version and its decision remain inspectable in history.
+Listing filters combine with AND; a valid unmatched application filter returns an empty list. Lists are unpaginated. History includes `event_id`, `version_number`, `event_type`, `actor_id`, `actor_login`, `occurred_at`, and a `version` object with exact terms, optional context snapshot, submitter, UTC time, status, and optional final decision. The version object is associated data, not a snapshot of its status when the event occurred. A current detail also includes application reference; an earlier version and its decision/context remain inspectable in history.
 
 For example, after approving a 25-bps version and revising to 40 bps, details show current version 2, status `pending`, and discount 40; history retains version 1 and its 25-bps approval; approved pricing is `{application_id,status:"none"}`. Approving version 2 makes the pricing response `{application_id,status:"approved",request_id,version_number:2,discount_bps:40}`.
 

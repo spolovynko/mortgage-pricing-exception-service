@@ -9,7 +9,8 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
-from starlette.responses import JSONResponse
+from starlette.responses import HTMLResponse, JSONResponse
+from starlette.staticfiles import StaticFiles
 
 from mortgage_pricing.api_foundation import DemoError, demo_error_handler
 from mortgage_pricing.api_foundation import router as demo_router
@@ -34,7 +35,8 @@ class ReadinessResponse(BaseModel):
     status: Literal["ready"]
 
 
-SCHEMA_REVISION = "20261029_0001"
+SCHEMA_REVISION = "20261029_0002"
+UI_DIRECTORY = Path(__file__).resolve().parents[2] / "ui"
 
 
 def database_ready(app: FastAPI) -> bool:
@@ -89,6 +91,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(workflow_router)
     app.include_router(pricing_router)
 
+    @app.get("/", include_in_schema=False)
+    def user_interface() -> HTMLResponse:
+        index = (UI_DIRECTORY / "index.html").read_text(encoding="utf-8")
+        timeout_ms = int(app.state.settings.ui_timeout_seconds * 1000)
+        return HTMLResponse(index.replace("{{API_TIMEOUT_MS}}", str(timeout_ms)))
+
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     def health() -> HealthResponse:
         return HealthResponse(status="ok")
@@ -101,4 +109,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             503, "database_unavailable", "Database is not ready.", request.state.correlation_id
         )
 
+    app.mount("/ui", StaticFiles(directory=UI_DIRECTORY), name="ui-assets")
     return app

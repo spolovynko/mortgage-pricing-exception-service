@@ -76,7 +76,7 @@ Do not hold a write transaction open during a model call. Capture the requested 
 
 Validate input at the API boundary and enforce business rules server-side. Distinguish missing resources, invalid input, permission failures, stale versions, and conflicting operations through documented errors.
 
-Do not let the UI write directly to storage or invoke the model server. Preserve idempotency keys during retries and avoid side effects caused by Streamlit reruns. An explicit user action initiates assessment generation. The assistance toggle is local to the current session.
+Do not let the UI write directly to storage or invoke the model server. Preserve idempotency keys during retries. Rendering, filtering, refreshing, or changing a preference must not initiate business writes or inference; explicit actions initiate writes. The assistance toggle is local to the current browser session.
 
 Simulated identity must be clearly identified and configured. Hiding a button does not enforce a permission. Prevent self-review and stale decisions in the backend.
 

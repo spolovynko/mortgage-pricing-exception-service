@@ -23,6 +23,7 @@ from mortgage_pricing.persistence.models import (
     RequestVersion,
     User,
 )
+from mortgage_pricing.request_context import RequestContext
 
 router = APIRouter(
     tags=["requests"],
@@ -53,6 +54,7 @@ class VersionView(BaseModel):
     version_number: int
     discount_bps: int
     reason: str
+    context: RequestContext | None = None
     submitted_by_id: UUID
     submitted_by_login: str
     submitted_at: datetime
@@ -104,6 +106,7 @@ def _view(session, request: PricingRequest, version: RequestVersion) -> VersionV
         version_number=version.version_number,
         discount_bps=version.discount_bps,
         reason=version.reason,
+        context=version.context,
         submitted_by_id=version.submitted_by_id,
         submitted_by_login=submitter.login,
         submitted_at=version.submitted_at,

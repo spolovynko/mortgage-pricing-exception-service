@@ -6,7 +6,7 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 Phase 01 is complete: installable Python package, locked development tools, validated configuration, health API, structured request logging, and safe correlated error responses. Its fresh-install verification passed on Windows/CPython 3.12.12 with **48 tests passing**. See the [Phase 01 handoff](docs/handoffs/phase-01.md).
 
-Phases 02–04 are complete. SQLite persistence, synthetic seeds, the human approval API, and a minimal Streamlit UI for requests, review, and history are available. `/health` reports process liveness and `/ready` checks migrated storage. The UI uses HTTP only; demo identities are simulated and assessment generation remains unavailable until Phase 06. See the [Phase 03 contract](docs/phase-03-api-contract.md), [ADR 0003](docs/adr/0003-business-rules-and-api.md), [ADR 0004](docs/adr/0004-user-interface.md), and [Phase 04 handoff](docs/handoffs/phase-04.md). Containers and model integration remain later-phase work.
+Phases 02–04 are complete. SQLite persistence, synthetic seeds, the human approval API, and a minimal HTML/CSS/JavaScript UI for requests, review, and history are available from one Uvicorn process. `/health` reports process liveness and `/ready` checks migrated storage. The UI uses same-origin HTTP only; demo identities are simulated and assessment generation remains unavailable until Phase 06. See the [Phase 03 contract](docs/phase-03-api-contract.md), [ADR 0003](docs/adr/0003-business-rules-and-api.md), [ADR 0009](docs/adr/0009-single-process-html-ui.md), and [Phase 04 handoff](docs/handoffs/phase-04.md). Containers and model integration remain later-phase work.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -119,7 +119,16 @@ After migration and seeding, set `$env:DEMO_IDENTITY_MODE = "header"` before sta
 
 ## User interface (Phase 04)
 
-With the API running, set `$env:UI_API_URL = "http://127.0.0.1:8000"` and start the UI from the repository root with `uv run --locked streamlit run ui/app.py --server.address 127.0.0.1`. The sidebar selects a fictional demo identity and offers Requests, Review (reviewers only), and History. Writes require explicit form actions; AI assistance is a session preference and assessment generation is disabled until Phase 06. See [ADR 0004](docs/adr/0004-user-interface.md), the [Phase 04 guide](docs/phases/phase-04-user-interface.md), and the [handoff](docs/handoffs/phase-04.md).
+After migration and seeding, start the API and UI together from the repository root:
+
+```powershell
+$env:DEMO_IDENTITY_MODE = "header"
+uv run --locked uvicorn mortgage_pricing.main:create_app --factory --host 127.0.0.1 --port 8000 --log-config config/logging.json --no-access-log
+```
+
+Open `http://127.0.0.1:8000/`. FastAPI serves separate `ui/index.html`, `ui/styles.css`, and `ui/app.js` files; browser requests use same-origin API routes. The interface selects fictional demo identities and offers Requests, Review (reviewers only), and History. Writes require explicit actions; AI assistance is a session preference and assessment generation is disabled until Phase 06. See [ADR 0009](docs/adr/0009-single-process-html-ui.md), the [Phase 04 guide](docs/phases/phase-04-user-interface.md), and the [handoff](docs/handoffs/phase-04.md).
+
+Each new request version records structured mortgage context (purpose, rate type, loan/property values with currency, term, and standard rate) alongside a free-text reason and reason category. Competitor offer details are optional and labelled manager-reported/unverified. The form includes synthetic example presets that prefill editable fields; they do not save until Submit. No borrower-identifying or creditworthiness data is requested. Context is versioned and returned in details/history for future assistance; see [ADR 0010](docs/adr/0010-versioned-request-context.md) and the [API contract](docs/phase-03-api-contract.md).
 
 Known fictional logins are `ada.manager`, `grace.manager`, `blake.reviewer`, and `casey.reviewer`. A client can bootstrap the user selector by supplying `X-Demo-User: ada.manager` to `/demo/users`; `/demo/applications` exposes references and owners. Both internal roles can read all internal records. Only the owning manager can submit/revise; independent reviewers decide.
 
@@ -173,7 +182,7 @@ Change the phase number and guide for each subsequent chat. Use the same reposit
 
 ## Planned stack
 
-Python, FastAPI/Uvicorn, Pydantic Settings, SQLAlchemy, SQLite, Alembic, Streamlit, HTTPX2, and pytest. A single application Dockerfile will build an image shared by separate API, UI, and model-initialisation containers. Optional Ollama services will provide local AI assistance.
+Python, FastAPI/Uvicorn, Pydantic Settings, SQLAlchemy, SQLite, Alembic, plain HTML/CSS/JavaScript, and pytest. A single application Dockerfile will build an image shared by separate API, UI, and model-initialisation containers. Optional Ollama services will provide local AI assistance.
 
 ## Target startup experience
 

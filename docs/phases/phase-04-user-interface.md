@@ -1,57 +1,34 @@
 # Phase 04 - User interface
 
-- Status: Complete (2026-10-29); implementation and acceptance evidence recorded below.
+- Status: Complete with structured-context follow-up (2026-10-29); implementation and verification evidence recorded. Human acceptance is not recorded.
 - Milestone: MVP2.
-- Prerequisite: Phase 03 API contracts and behaviour verified.
-- Primary ADR to create: `docs/adr/0004-user-interface.md`.
-- Handoff to create: `docs/handoffs/phase-04.md`.
+- Prerequisite: Phase 03 API contracts and behavior verified.
+- Primary ADR: [ADR 0004](../adr/0004-user-interface.md), superseded for runtime delivery by [ADR 0009](../adr/0009-single-process-html-ui.md); structured context is in [ADR 0010](../adr/0010-versioned-request-context.md).
+- Handoff: [Phase 04](../handoffs/phase-04.md).
 
 ## Objective
 
-Let an evaluator complete the human workflow in a simple Streamlit UI. Provide an honest, initially unavailable AI control that can be connected in Phase 06.
+Let an evaluator complete the human workflow in a minimal browser UI served by the API process. Keep an honest, unavailable AI control for Phase 06.
 
-## Read first
+## Scope and boundaries
 
-[AGENTS.md](../../AGENTS.md), [requirements](../requirements.md), [architecture](../architecture.md), [engineering guidelines](../python-engineering-guidelines.md), current status, the Phase 03 handoff, and API/version-policy ADRs.
+Keep `ui/index.html`, `ui/styles.css`, and `ui/app.js` separate. FastAPI serves them from the same origin as the API. The UI communicates over HTTP and never imports persistence code or calls Ollama. Permissions, business rules, versions, and decisions remain backend-enforced.
 
-## Scope and expected components
+## Acceptance
 
-Create ui/app.py and a small HTTP API client. Split views only when it makes the UI clearer. The UI must not import persistence code or talk directly to Ollama.
+- [x] One Uvicorn process serves the UI and API; its root page loads separate HTML, CSS, and JavaScript files.
+- [x] Requests, Review, and History provide navigation, filters, and clear empty states; controls reflect the simulated demo user's role.
+- [x] Request/application details show exact terms, structured context snapshots, versions, status, actors, decisions, and timestamps. Prior approvals are labelled historical; pricing is shown only when currently approved.
+- [x] New versions capture typed mortgage facts, reason category, and optional unverified competitor offer alongside free-text reason; context is immutable per version and included in history.
+- [x] Create and revision preserve entered text/context across failures; retries retain a session-scoped idempotency key that fingerprints structured context too. Revisions explain fresh review and retain a new context snapshot.
+- [x] Decisions submit the version displayed to the reviewer. A stale conflict refreshes both detail and queue before a fresh review.
+- [x] API error envelopes, timeout/unavailable states, and correlation IDs are visible and safe to retry.
+- [x] The assistance preference is tab-session scoped; Generate assessment is disabled and labelled unavailable until Phase 06.
+- [x] Rendering, filters, refreshes, and toggles do not trigger business writes or inference. Static-serving tests and live workflows provide UI evidence.
+- [x] Synthetic presets fill editable fields only; a request is written only after explicit submission.
 
-## Implementation tasks
+## Verification and evidence
 
-- [x] Create Requests, Review, and History screens with useful navigation and empty states.
-- [x] Add a clearly labelled demo-user selector using seeded identities and server-side role checks.
-- [x] List/select applications and requests; show submitted terms, current version, status, creator, decisions, and timestamps.
-- [x] Provide create and revision forms with helpful input errors and an explanation that revised terms need fresh review.
-- [x] Preserve an idempotency key for one submission across retries. Generate a new key only for a genuinely new submission intent.
-- [x] Submit the version the reviewer actually opened with each decision. On a stale-version conflict, show a clear refresh/review path.
-- [x] Display earlier approved versions as historical when a newer version is pending; do not suggest they are currently usable.
-- [x] Handle API errors, timeouts, and unavailable backend states without losing entered text unnecessarily.
-- [x] Add a session-scoped Use AI assistance toggle and explicit Generate assessment action. Until Phase 06, disable generation and show that AI is not implemented/available; do not fabricate output.
-- [x] Keep all side-effecting operations behind explicit user actions and prevent Streamlit reruns from resubmitting requests or decisions.
-- [x] Add UI tests for important interactions using Streamlit AppTest with an explicit fake API client where appropriate.
+The [architecture update build entry](../build-log.md#2026-10-29---phase-04-single-process-html-ui-update) and [structured-context follow-up](../build-log.md#2026-10-29---phase-04-structured-request-context) record commands/results, static-serving and API tests, live browser workflows against isolated migrated/seeded databases, session/retry/stale behavior, no-write checks, context snapshots, and limits. ADR 0010 records the additive data contract. The earlier Streamlit build evidence remains historical. The root `ui/` files are source-tree assets and must be included in the Phase 05 runtime image.
 
-## Verification
-
-Manually complete create/approve/retrieve, decline/history, and revise/review flows through the real backend. Switch between two user sessions or simulated session contexts and verify assistance choices do not become global state. Confirm direct API calls still enforce permissions regardless of UI visibility.
-
-Test a backend failure, a repeated form action/retry, and an outdated review screen. Verify changing filters or toggles does not make unintended write calls.
-
-## Acceptance criteria
-
-- [x] An evaluator can use the complete human workflow without manually constructing JSON.
-- [x] UI state matches backend state, including current versions and old approvals.
-- [x] Important UI tests pass, and actual end-to-end human scenarios have been exercised.
-- [x] Demo identity and unavailable AI are labelled accurately.
-- [x] Toggle changes/reruns do not trigger inference or business writes automatically.
-
-## Decision record and handover
-
-Explain screen layout, UI/API separation, session/retry handling, error states, and the planned AI interaction. Record manual and automated outcomes. Update this guide, the ADR index, [build log](../build-log.md), [AI usage](../ai-usage.md), and [project status](../project-status.md), then write the handoff.
-
-Stop after Phase 04. The next phase packages the working human UI/API workflow in containers.
-
-## Completion evidence
-
-The final build-log entry records the exact commands, AppTest evidence, live HTTP/UI workflows, session/error/retry/stale checks, static/dependency gate, and limits. Live workflows used a temporary migrated file-backed SQLite database with fictional seed identities; AppTest uses an explicit fake API client. The assistant reviewed code and results. Human review/acceptance and active work time are not recorded. The root `ui/` source tree is used by the repository-run Streamlit entry point and is not included in the Python wheel package list; Phase 05 must include this tree in its shared runtime image.
+Stop after Phase 04. Phase 05 begins only with separate user authorization.

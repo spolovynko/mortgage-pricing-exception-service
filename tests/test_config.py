@@ -15,7 +15,6 @@ def test_defaults_are_valid_and_safe() -> None:
     assert settings.llm_mode == "off"
     assert settings.llm_timeout_seconds == 30
     assert settings.sqlite_busy_timeout_seconds == 5
-    assert "127.0.0.1" in str(settings.ui_api_url)
     assert "127.0.0.1" in str(settings.llm_base_url)
     assert "password" not in repr(settings)
 
@@ -75,7 +74,6 @@ def test_example_file_contains_valid_defaults() -> None:
         ("SQLITE_BUSY_TIMEOUT_SECONDS", "30.1"),
         ("SQLITE_BUSY_TIMEOUT_SECONDS", "nan"),
         ("DATABASE_URL", "mysql://localhost/db"),
-        ("UI_API_URL", "file:///private-path"),
         ("LLM_BASE_URL", "not-a-url"),
         ("LLM_TIMEOUT_SECONDS", "nan"),
         ("LLM_TIMEOUT_SECONDS", "inf"),

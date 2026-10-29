@@ -11,6 +11,7 @@ from mortgage_pricing.api_foundation import ActorId
 from mortgage_pricing.errors import ErrorResponse, error_response
 from mortgage_pricing.persistence.database import create_session_factory
 from mortgage_pricing.persistence.operations import MAX_DISCOUNT_BPS, OperationError, create_request
+from mortgage_pricing.request_context import RequestContext
 
 router = APIRouter(tags=["requests"])
 
@@ -21,6 +22,7 @@ class CreateRequestBody(BaseModel):
     application_id: UUID
     discount_bps: int = Field(strict=True, gt=0, le=MAX_DISCOUNT_BPS)
     reason: str = Field(min_length=1, max_length=2000)
+    context: RequestContext | None = None
 
 
 class CreateRequestResult(BaseModel):
@@ -61,6 +63,18 @@ CREATE_ERRORS = {
                         "application_id": "00000000-0000-0000-0000-000000000001",
                         "discount_bps": 25,
                         "reason": "Synthetic customer retention request",
+                        "context": {
+                            "application": {
+                                "purpose": "purchase",
+                                "rate_type": "fixed",
+                                "loan_amount": "250000.00",
+                                "property_value": "320000.00",
+                                "currency_code": "EUR",
+                                "term_months": 300,
+                                "standard_rate_bps": 425,
+                            },
+                            "reason_category": "retention",
+                        },
                     }
                 }
             }
@@ -82,6 +96,7 @@ def post_request(
             discount_bps=body.discount_bps,
             reason=body.reason,
             idempotency_key=idempotency_key,
+            context=body.context.model_dump(mode="json") if body.context else None,
         )
     except OperationError as exc:
         status, message = CREATE_ERRORS[exc.code]

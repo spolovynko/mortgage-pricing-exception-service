@@ -2,7 +2,7 @@
 
 - Date: 2026-10-29.
 - Phase/milestone: Phase 04, MVP2.
-- Status: Implemented. Human acceptance is not recorded.
+- Status: Superseded by [ADR 0009](0009-single-process-html-ui.md). The original Streamlit implementation was completed; the replacement decision is recorded separately. Human acceptance is not recorded.
 - Contributor: Codex, following user-authorized implementation steps.
 - Related requirements: BONUS-01, P-09; Phase 04 guide.
 - Verification: [Phase 04 build log](../build-log.md#2026-10-29---phase-04-user-interface-and-final-acceptance).

@@ -16,6 +16,7 @@ from mortgage_pricing.persistence.operations import (
     decide_request,
     revise_request,
 )
+from mortgage_pricing.request_context import RequestContext
 
 router = APIRouter(
     tags=["requests"],
@@ -36,6 +37,7 @@ class RevisionBody(BaseModel):
     expected_version: int = Field(strict=True, ge=1)
     discount_bps: int = Field(strict=True, gt=0, le=MAX_DISCOUNT_BPS)
     reason: str = Field(min_length=1, max_length=2000)
+    context: RequestContext | None = None
 
 
 class RevisionResult(BaseModel):
@@ -86,6 +88,18 @@ def _operation_error(request: Request, exc: OperationError) -> JSONResponse:
                         "expected_version": 1,
                         "discount_bps": 40,
                         "reason": "Synthetic revised terms",
+                        "context": {
+                            "application": {
+                                "purpose": "remortgage",
+                                "rate_type": "fixed",
+                                "loan_amount": "210000.00",
+                                "property_value": "300000.00",
+                                "currency_code": "EUR",
+                                "term_months": 240,
+                                "standard_rate_bps": 420,
+                            },
+                            "reason_category": "competitive_offer",
+                        },
                     }
                 }
             }
@@ -103,6 +117,7 @@ def post_revision(
             expected_version=body.expected_version,
             discount_bps=body.discount_bps,
             reason=body.reason,
+            context=body.context.model_dump(mode="json") if body.context else None,
         )
     except OperationError as exc:
         return _operation_error(request, exc)

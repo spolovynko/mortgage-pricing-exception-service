@@ -24,7 +24,7 @@ Use uppercase tags, no spaces between bracketed tags, and one space before the d
 | API | HTTP endpoints, transport schemas, responses |
 | AUTH | Identity and permission checks |
 | DB | Models, migrations, storage, seed data |
-| UI | Streamlit screens and interactions |
+| UI | Browser UI assets and interactions |
 | LLM | Model adapter, prompts, AI assessments and evaluation |
 | DOCKER | Dockerfile, Compose, runtime/model bootstrap, volumes |
 | TEST | Changes primarily to automated tests |

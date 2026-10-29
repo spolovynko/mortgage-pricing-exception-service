@@ -183,3 +183,15 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Contribution/tools: Codex completed the authorized Streamlit UI work, corrected its source-script import behavior after a live launch exposed it, and exercised the actual UI against a temporary migrated/seeded backend. PowerShell, Git, uv, pytest/AppTest, Ruff, Uvicorn, and the in-app browser were used. No subagents or product-model calls were used.
 - Review/evidence: assistant inspected code and command output. AppTest used an explicit fake API client; live request/review/history/revision flows used the real API and fictional identities. The exact 13-test focused run, 146-test final suite, static/dependency checks, live workflow results, and material limits are in the [Phase 04 build entry](build-log.md#2026-10-29---phase-04-user-interface-and-final-acceptance).
 - Limits: the assistant's review is not human review or acceptance. No active work time, production auth, container deployment, or model behavior is claimed. No commit or push was made.
+
+## 2026-10-29 - Phase 04 single-process HTML UI update
+
+- Contribution/tools: Codex replaced the Streamlit delivery with separate HTML/CSS/JavaScript assets served by FastAPI, removed obsolete UI base-URL configuration, and updated architecture/handoff records. PowerShell, Git, uv, pytest, Ruff, Node, Uvicorn, and the in-app browser were used; no subagents or product-model calls.
+- Review/evidence: the assistant reviewed the source and exercised real browser workflows against an isolated migrated/seeded backend. Exact test, static, dependency, live workflow, and database no-write results and limits are in the [architecture update build entry](build-log.md#2026-10-29---phase-04-single-process-html-ui-update). Automated asset/API tests and live browser checks are distinguished there.
+- Limits: assistant review is not human acceptance. No active work time, production auth, containers, model behavior, commit, or push is claimed.
+
+## 2026-10-29 - Phase 04 structured request context
+
+- Contribution/tools: Codex added the validated request-context schema, additive migration, API snapshots and retry fingerprinting, structured browser forms, and editable synthetic examples. PowerShell, Git, uv, pytest, Ruff, Node, Uvicorn, and the in-app browser were used. No subagents or product-model calls were used.
+- Review/evidence: exact 138-test suite, migration and replay compatibility, static checks, live create/approve/revise/history and outage-retry scenarios, and remaining limits are in the [structured-context build entry](build-log.md#2026-10-29---phase-04-structured-request-context). Assistant review is distinct from human acceptance.
+- Limits: AI did not consume the fields; no recognition/accuracy claim is made. No production auth, containers, active work time, commit, or push claimed.

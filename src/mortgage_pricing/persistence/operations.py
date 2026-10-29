@@ -79,9 +79,21 @@ def _validate_terms(discount_bps: int, reason: str) -> None:
         raise OperationError("invalid_terms")
 
 
-def _fingerprint(application_id: UUID, discount_bps: int, reason: str) -> str:
+def _fingerprint(
+    application_id: UUID,
+    discount_bps: int,
+    reason: str,
+    context: dict[str, object] | None,
+) -> str:
+    payload: dict[str, object] = {
+        "application_id": str(application_id),
+        "discount_bps": discount_bps,
+        "reason": reason,
+    }
+    if context is not None:
+        payload["context"] = context
     canonical = json.dumps(
-        {"application_id": str(application_id), "discount_bps": discount_bps, "reason": reason},
+        payload,
         sort_keys=True,
         ensure_ascii=False,
         separators=(",", ":"),
@@ -97,12 +109,13 @@ def create_request(
     discount_bps: int,
     reason: str,
     idempotency_key: str,
+    context: dict[str, object] | None = None,
 ) -> VersionResult:
     """Create version 1 once per application; replay only identical caller/key/input."""
     _validate_terms(discount_bps, reason)
     if not isinstance(idempotency_key, str) or not 1 <= len(idempotency_key.strip()) <= 128:
         raise OperationError("invalid_idempotency_key")
-    fingerprint = _fingerprint(application_id, discount_bps, reason)
+    fingerprint = _fingerprint(application_id, discount_bps, reason, context)
     with sessions.begin() as session:
         application = _lock_application(session, application_id)
         _require_role(session, caller_id, Role.RELATIONSHIP_MANAGER)
@@ -129,6 +142,7 @@ def create_request(
                 version_number=1,
                 discount_bps=discount_bps,
                 reason=reason,
+                context=context,
                 submitted_by_id=caller_id,
             )
         )
@@ -162,6 +176,7 @@ def revise_request(
     expected_version: int,
     discount_bps: int,
     reason: str,
+    context: dict[str, object] | None = None,
 ) -> VersionResult:
     """Append a version and history only when the caller saw the current version."""
     _validate_terms(discount_bps, reason)
@@ -179,6 +194,7 @@ def revise_request(
                 version_number=number,
                 discount_bps=discount_bps,
                 reason=reason,
+                context=context,
                 submitted_by_id=caller_id,
             )
         )

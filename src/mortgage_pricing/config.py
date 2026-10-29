@@ -23,7 +23,6 @@ class Settings(BaseSettings):
     database_url: str = Field(default="sqlite:///./data/mortgage_pricing.db", repr=False)
     sqlite_busy_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
     demo_identity_mode: Literal["off", "header"] = "off"
-    ui_api_url: HttpUrl = HttpUrl("http://127.0.0.1:8000/")
     ui_timeout_seconds: float = Field(default=10.0, gt=0, le=120)
     llm_mode: Literal["off", "auto"] = "off"
     llm_base_url: HttpUrl = HttpUrl("http://127.0.0.1:11434/")

@@ -2,13 +2,15 @@
 
 Status: Phases 01-04 are complete. The human UI/API workflow is implemented; container delivery and model integration remain later phases. Use ADRs for rationale.
 
-Phase 01 completed (2026-10-29): packaging, Python 3.12/uv setup, configuration, `/health`, request tracing, and safe error responses are implemented and verified with a fresh environment and 48 passing tests. The Phase 04 Streamlit UI is implemented in root `ui/` and calls FastAPI through HTTP only; see [ADR 0004](adr/0004-user-interface.md) and the [handoff](handoffs/phase-04.md). The root UI directory is excluded from the Python wheel and must be included by the Phase 05 shared runtime image.
+Phase 01 completed (2026-10-29): packaging, Python 3.12/uv setup, configuration, `/health`, request tracing, and safe error responses are implemented and verified with a fresh environment and 48 passing tests.
+
+Phase 04's separate HTML, CSS, and JavaScript assets in root `ui/` are served by FastAPI from the same process as its HTTP API; see [ADR 0009](adr/0009-single-process-html-ui.md) and the [handoff](handoffs/phase-04.md). The root UI directory is excluded from the Python wheel and must be included in the Phase 05 runtime image.
 
 ## Components and boundaries
 
 ```mermaid
 flowchart TD
-    Person[Manager or reviewer] --> UI[Streamlit UI]
+    Person[Manager or reviewer] --> UI[HTML CSS JavaScript UI]
     UI --> API[FastAPI API]
     Mortgage[Mortgage application process] --> API
     API --> Rules[Python business services]
@@ -22,7 +24,7 @@ flowchart TD
 - **API:** transport validation, configured identity, permissions, consistent errors, and operation tracing.
 - **Business services:** creation, revisions, decisions, history, and approved-discount selection. Enforce rules independently of the UI.
 - **Persistence:** SQLAlchemy models, database sessions, constraints, and transaction boundaries. Alembic manages schema changes.
-- **UI:** Streamlit screens and HTTP calls to the API. No direct database writes or direct model access.
+- **UI:** FastAPI serves the static browser assets; JavaScript makes same-origin HTTP calls. No direct database writes or model access.
 - **AI adapter:** bounded calls to Ollama, structured-response validation, and assessment metadata. No tools that change approval state.
 - **Model-init:** wait for the runtime, inspect the local cache, download only if missing, warm up, and report results. It is independent of core API readiness.
 
@@ -41,8 +43,9 @@ src/mortgage_pricing/
   persistence/
   ai/
 ui/
-  app.py
-  client.py
+  index.html
+  styles.css
+  app.js
 scripts/
   init_model.py
   evaluate_ai.py
@@ -58,21 +61,21 @@ Phase 02 adds shared SQLAlchemy metadata with stable constraint names, a lazy SQ
 
 The owner closes sessions/connections before engine disposal. Each operation owns one session; `factory.begin()` provides commit/rollback/closure, while a plain session context does not implicitly commit. SQLite uses `autocommit=False` and enables foreign keys on every connection. Temporary file-backed tests verify transactional DDL/savepoints, FK rejection, and bounded writer lock errors; the application has no automatic retry. Users have role memberships and applications belong to a user with the relationship-manager role. The composite ownership reference rejects a reviewer-only owner. The API owns a lazy engine for readiness and disposes it at shutdown. Alembic revision `20261029_0001` creates the operational schema; tests use isolated temporary files. The following describes implemented data behavior:
 
-A logical request belongs to one application and contains numbered versions. The composite foreign key ensures its current-version pointer identifies a version of that same request. Each version stores its exact basis-point discount, reason, submitter and UTC time. A decision links to one version, has a reviewer-role decision maker and approved/declined outcome; a unique constraint permits at most one decision per version. Typed history events link to the exact version and actor. Creation idempotency records use caller/key identity, a canonical-input SHA-256 fingerprint, and the original version-1 reference. ORM edits/deletes of submitted versions, decisions, history and retry mappings are rejected; the migration's SQLite triggers also protect stored rows from direct SQL changes. Operations hash deterministic JSON of exact submitted input, replay the original reference for identical caller/key/input, reject changed input, and commit each business change with its history in one transaction.
+A logical request belongs to one application and contains numbered versions. The composite foreign key ensures its current-version pointer identifies a version of that same request. Each version stores its exact basis-point discount, free-text reason, optional validated structured context snapshot, submitter and UTC time. The context includes non-identifying mortgage attributes and request rationale; its detailed contract is in [ADR 0010](adr/0010-versioned-request-context.md). A decision links to one version, has a reviewer-role decision maker and approved/declined outcome; a unique constraint permits at most one decision per version. Typed history events link to the exact version and actor. Creation idempotency records use caller/key identity, a canonical-input SHA-256 fingerprint, and the original version-1 reference. ORM edits/deletes of submitted versions, decisions, history and retry mappings are rejected; migrations' SQLite triggers also protect stored rows from direct SQL changes. Operations hash deterministic JSON of exact submitted input, replay the original reference for identical caller/key/input, reject changed input, and commit each business change with its history in one transaction.
 
-Step 8 operations use a first-statement no-op UPDATE of the application or request to obtain SQLite's writer lock before mutable reads. Competing writers then serialize and recheck state or receive a bounded lock error; there is no automatic retry. Unique keys remain database-enforced. File-backed tests verify competing decisions/revisions and rollback of failed multi-row writes. Alembic revision `20261029_0001` also adds SQLite triggers that reject direct SQL mutations of immutable rows. See [ADR 0002](adr/0002-database-and-seed-data.md).
+Step 8 operations use a first-statement no-op UPDATE of the application or request to obtain SQLite's writer lock before mutable reads. Competing writers then serialize and recheck state or receive a bounded lock error; there is no automatic retry. Unique keys remain database-enforced. File-backed tests verify competing decisions/revisions and rollback of failed multi-row writes. Alembic revision `20261029_0001` adds immutable-row triggers; `20261029_0002` adds nullable JSON context to request versions without changing legacy records. See [ADR 0002](adr/0002-database-and-seed-data.md) and [ADR 0010](adr/0010-versioned-request-context.md).
 
 The seed command runs after migrations and inserts only fixed fictional baseline identities and applications. Re-running it preserves unrelated data and does not manufacture pending or decided requests. A clean seeded application remains available for the later create/approve demonstration.
 
 `GET /ready` checks for an existing SQLite file at the current Alembic revision and returns a safe 503 when it cannot use that storage. `GET /health` remains process liveness. The app owns a lazy engine and disposes it at shutdown; optional AI is outside core readiness. See [ADR 0002](adr/0002-database-and-seed-data.md).
 
-Phase 03 implements create/list/inspect, submit revision, decide an exact version, history, current approved pricing, and demo identity/application lookups. The [HTTP contract](phase-03-api-contract.md) and [ADR 0003](adr/0003-business-rules-and-api.md) define validation, permissions, error codes, and 201/200 creation replay semantics. Both seeded internal roles read all internal records; owning managers submit/revise, independent reviewers decide. The configured demo login header simulates identity. Approved pricing returns only the current approved version, or a successful `none` outcome for an existing application without current approval. AI availability and assessment operations remain later-phase work.
+Phase 03 implements create/list/inspect, submit revision, decide an exact version, history, current approved pricing, and demo identity/application lookups. The [HTTP contract](phase-03-api-contract.md) and [ADR 0003](adr/0003-business-rules-and-api.md) define validation, permissions, error codes, and 201/200 creation replay semantics. The Phase 04 follow-up adds typed, per-version context snapshots; the API remains compatible with omitted context. Both seeded internal roles read all internal records; owning managers submit/revise, independent reviewers decide. The configured demo login header simulates identity. Approved pricing returns only the current approved version, or a successful `none` outcome for an existing application without current approval. AI availability and assessment operations remain later-phase work.
 
 ## Shared image and Compose
 
 Maintain **one application Dockerfile** and **one compose.yaml**. API, UI, and the Python model-init job use the shared application image with different commands. Ollama uses a pinned official image. The model weights are not baked into the application image or committed to Git.
 
-The UI calls `http://api:8000` on the Compose network. The backend calls `http://ollama:11434` when that service exists. Container `localhost` refers to that container, not another service. Publish UI/API demonstration ports to host loopback; keep Ollama internal to the Compose network unless a documented local debugging need requires otherwise.
+The browser UI uses same-origin API paths, so Phase 05 must route browser traffic to the Uvicorn instance that serves the HTML assets; a Compose-only hostname cannot be embedded as the browser API URL. Reconcile this routing with the planned API/UI container split before implementing Compose. The backend calls `http://ollama:11434` when that service exists. Container `localhost` refers to that container, not another service. Publish the browser-facing entry point to host loopback; keep Ollama internal to the Compose network unless a documented local debugging need requires otherwise.
 
 Use separate named volumes for application data and model cache. API/UI are core services; Ollama/model-init belong to the optional `ai` profile. Do not make core API startup depend on successful model setup.
 

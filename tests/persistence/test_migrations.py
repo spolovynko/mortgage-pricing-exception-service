@@ -1,8 +1,10 @@
 """Initial Alembic schema migration on isolated file-backed SQLite databases."""
 
+import json
 from collections.abc import Iterator
+from hashlib import sha256
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from alembic import command
@@ -18,8 +20,10 @@ from mortgage_pricing.persistence.models import (
     DecisionOutcome,
     PricingDecision,
     RequestHistoryEvent,
+    RequestVersion,
 )
 from mortgage_pricing.persistence.operations import create_request, decide_request
+from mortgage_pricing.seed import APPLICATIONS, seed_database
 from tests.persistence.test_operations import prepare
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -74,6 +78,86 @@ def test_upgrade_creates_schema_and_second_run_preserves_rows(
         assert created.request_id is not None
 
 
+def test_context_migration_preserves_existing_request_versions(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        database_url=f"sqlite:///{(tmp_path / 'legacy-context.db').as_posix()}",
+    )
+    config = Config(str(ROOT / "alembic.ini"))
+    config.attributes["settings"] = settings
+    command.upgrade(config, "20261029_0001")
+    seed_database(settings)
+
+    request_id = uuid4()
+    engine = create_database_engine(settings)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO pricing_requests "
+                "(id, application_id, current_version_number, created_at) "
+                "VALUES (:id, :application_id, NULL, '2026-10-29 00:00:00.000000')"
+            ),
+            {"id": request_id.hex, "application_id": APPLICATIONS[0].id.hex},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO request_versions "
+                "(request_id, version_number, discount_bps, reason, submitted_by_id, submitted_at) "
+                "VALUES (:request_id, 1, 25, 'Legacy request', :manager_id, "
+                "'2026-10-29 00:00:00.000000')"
+            ),
+            {"request_id": request_id.hex, "manager_id": APPLICATIONS[0].manager_id.hex},
+        )
+        connection.execute(
+            text("UPDATE pricing_requests SET current_version_number = 1 WHERE id = :id"),
+            {"id": request_id.hex},
+        )
+        canonical = json.dumps(
+            {
+                "application_id": str(APPLICATIONS[0].id),
+                "discount_bps": 25,
+                "reason": "Legacy request",
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        connection.execute(
+            text(
+                "INSERT INTO creation_idempotency_records "
+                "(caller_id, key, input_fingerprint, request_id, version_number, created_at) "
+                "VALUES (:caller_id, 'legacy-key', :fingerprint, :request_id, 1, "
+                "'2026-10-29 00:00:00.000000')"
+            ),
+            {
+                "caller_id": APPLICATIONS[0].manager_id.hex,
+                "fingerprint": sha256(canonical.encode("utf-8")).hexdigest(),
+                "request_id": request_id.hex,
+            },
+        )
+    engine.dispose()
+
+    command.upgrade(config, "head")
+    upgraded_engine = create_database_engine(settings)
+    try:
+        with create_session_factory(upgraded_engine)() as session:
+            legacy_version = session.get(RequestVersion, (request_id, 1))
+            assert legacy_version is not None
+            assert legacy_version.reason == "Legacy request"
+            assert legacy_version.context is None
+        replay = create_request(
+            create_session_factory(upgraded_engine),
+            caller_id=APPLICATIONS[0].manager_id,
+            application_id=APPLICATIONS[0].id,
+            discount_bps=25,
+            reason="Legacy request",
+            idempotency_key="legacy-key",
+        )
+        assert replay.request_id == request_id and replay.replayed
+    finally:
+        upgraded_engine.dispose()
+
+
 def test_migration_enforces_foreign_keys_and_direct_sql_immutability(
     migrated_database: tuple[Settings, Engine, sessionmaker[Session]],
 ) -> None:
@@ -104,7 +188,8 @@ def test_migration_enforces_foreign_keys_and_direct_sql_immutability(
     statements = (
         (
             "request_versions",
-            "UPDATE request_versions SET discount_bps = 99 WHERE request_id = :request_id",
+            "UPDATE request_versions SET discount_bps = 99, context = '{}' "
+            "WHERE request_id = :request_id",
             {"request_id": created.request_id.hex},
             "DELETE FROM request_versions WHERE request_id = :request_id",
         ),

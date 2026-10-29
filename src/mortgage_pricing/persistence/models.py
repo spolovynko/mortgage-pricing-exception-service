@@ -7,6 +7,7 @@ from enum import StrEnum
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
+    JSON,
     CheckConstraint,
     Enum,
     ForeignKey,
@@ -167,6 +168,7 @@ class RequestVersion(Base):
     version_number: Mapped[int] = mapped_column(Integer, primary_key=True)
     discount_bps: Mapped[int] = mapped_column(Integer, nullable=False)
     reason: Mapped[str] = mapped_column(String(2000), nullable=False)
+    context: Mapped[dict[str, object] | None] = mapped_column(JSON, nullable=True)
     submitted_by_id: Mapped[UUID] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
     )
