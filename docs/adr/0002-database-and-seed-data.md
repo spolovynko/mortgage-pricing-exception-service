@@ -2,15 +2,15 @@
 
 - Date: 2026-10-29 (Europe/Brussels).
 - Phase / milestone: 02 / MVP1.
-- Status: Implemented through execution Step 9 only; Phase 02 remains in progress.
-- Implementation state: partial; SQLite configuration, storage models, atomic operations, and initial migration verified.
+- Status: Implemented through execution Step 10 only; Phase 02 remains in progress.
+- Implementation state: partial; SQLite configuration, storage models, atomic operations, initial migration, and seed data verified.
 - Decision owner or contributor: Codex assistant within the user's incremental Phase 02 requests.
 - Human acceptance: not recorded for the resulting implementation.
 - Related requirements and phase guide: NFR-01/03, DEL-02/03; [Phase 02](../phases/phase-02-database-and-seed-data.md).
 
 ## Context
 
-Step 1 verified the Phase 01 baseline. Step 2 began from clean `main` at `54e219e`, with the Step 1 records committed. The user authorized each later step separately. Steps 3-7 added SQLite transaction guarantees and business storage models; Step 8 added atomic operations; Step 9 adds the initial migration. Seeds remain Step 10, and API/database readiness wiring remains Step 11.
+Step 1 verified the Phase 01 baseline. Step 2 began from clean `main` at `54e219e`, with the Step 1 records committed. The user authorized each later step separately. Steps 3-7 added SQLite transaction guarantees and business storage models; Step 8 added atomic operations; Step 9 added the initial migration; Step 10 adds seed data. API/database readiness wiring remains Step 11.
 
 The project already uses immutable central settings, explicit application factories, safe JSON diagnostics, and shared HTTP error handling. Persistence should fit those boundaries. The agreed stack is SQLite through SQLAlchemy, with Alembic for schema evolution.
 
@@ -43,17 +43,18 @@ The project already uses immutable central settings, explicit application factor
 - Step 8 adds focused create, revise, and decide persistence functions, each owning `factory.begin()` so the business row and corresponding history commit or roll back together. Creation fingerprints deterministic JSON with sorted keys and compact separators, UTF-8 encoding, the application UUID, integer discount, and exact reason text; caller identity is carried by the composite key. Identical caller/key/input replays the stored version-1 reference even after later revisions, while changed input or a new key for an already requested application conflicts. Validation keeps the submitted reason unchanged. The manager must own the application and hold manager membership; the decision maker needs reviewer membership and cannot be the owner or version submitter. Revision and decision require the expected current version; a decided version cannot be decided twice.
 - Each write operation first performs a no-op UPDATE of its existing application or request row. SQLite obtains its single-writer lock before state reads, so competing writes serialize and recheck current state; a bounded busy failure propagates without automatic retry. This is a pragmatic SQLite-specific lock acquisition under the current `autocommit=False` transaction configuration. A future PostgreSQL implementation needs a different locking strategy. Tests use isolated files and real competing connections; no HTTP business contract is introduced here.
 - Step 9 configures Alembic to load validated `Settings` only when invoked, then applies explicit revision `20261029_0001`. It creates every Phase 02 table and database constraint without any startup schema creation. The initial revision adds SQLite `BEFORE UPDATE` and `BEFORE DELETE` triggers for submitted versions, decisions, history events, and retry mappings, extending ORM protection to direct SQL. The request/current-version foreign-key cycle uses `use_alter=True` in metadata so migration tooling can order it. SQLite reflection still produces false positive unique-constraint differences during `alembic check`; applied-schema tests verify this migration instead. Downgrade removes triggers before dropping the tables.
+- Step 10 uses fixed UUIDv5 identities and technical references for four clearly fictional users and three fictional applications. It reserves `SYN-MORTGAGE-DEMO-CLEAN` without a request, version, decision, or history so later work can demonstrate the complete creation and approval flow. The seed function opens a short transaction only after migration; it creates missing matching records, leaves unrelated rows untouched, and rejects identifier/content collisions rather than overwriting a local record. The command logs only a seed event and outcome. No artificial decisions are seeded.
 - Add ignore rules for local `data/`, SQLite database files, and journal/WAL/shared-memory sidecars. No real settings, normal database, or existing data directory is opened or removed.
 
 ## Consequences
 
 The common persistence boundary is available for later steps without adding business models or unnecessary abstraction layers. Factories can be injected and tested against separate files. Storage failures reach the calling boundary with no fabricated success.
 
-**This is an incomplete business persistence foundation.** Core models, SQLite-specific atomic writes, and the initial operational migration are verified in temporary databases. Seed data and API integration remain pending.
+**This is an incomplete business persistence foundation.** Core models, SQLite-specific atomic writes, the initial operational migration, and repeatable synthetic seed data are verified in temporary databases. API integration remains pending.
 
 Step 3 configures Python 3.12+ sqlite3 with `autocommit=False`, rather than relying on the driver's legacy mode. An engine-local connection listener temporarily enables autocommit to run `PRAGMA foreign_keys=ON`, then restores the prior value. This applies to every pooled DBAPI connection before use and does not introduce import-time I/O. A short busy timeout still raises a lock error under contention; callers must end the failed transaction and choose whether a later retry is valid. Journal mode remains SQLite's default; no automatic retry or cross-process update protocol is claimed. Keep business write transactions short.
 
-File-backed tests establish FK rejection, transactional DDL/savepoints, bounded writer contention, business storage constraints, Step 8 operation atomicity, competing-write outcomes, and the initial applied migration. Seed data and API integration remain pending.
+File-backed tests establish FK rejection, transactional DDL/savepoints, bounded writer contention, business storage constraints, Step 8 operation atomicity, competing-write outcomes, the initial applied migration, and repeatable seed behavior. API integration remains pending.
 
 Only tests create a simple probe table in pytest-owned temporary files. Application code does not create a schema. Operational schema setup must use Alembic in Step 9. The absence of a data directory will produce a storage error on connection; no implicit filesystem setup occurs here.
 

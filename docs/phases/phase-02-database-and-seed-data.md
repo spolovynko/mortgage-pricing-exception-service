@@ -1,9 +1,9 @@
 # Phase 02 - Database and seed data
 
-- Status: In progress; execution Steps 1-9 complete. Step 10 requires the user's instruction.
+- Status: In progress; execution Steps 1-10 complete. Step 11 requires the user's instruction.
 - Milestone: MVP1.
 - Prerequisite: Phase 01 complete or its unmet criteria explicitly resolved.
-- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 9 only.
+- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 10 only.
 - Handoff to create: `docs/handoffs/phase-02.md`.
 
 ## Objective
@@ -31,7 +31,7 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 7. [x] Define caller-scoped idempotency records.
 8. [x] Define and verify atomic operation boundaries.
 9. [x] Create and verify the initial Alembic migration.
-10. [ ] Add repeatable synthetic seed data.
+10. [x] Add repeatable synthetic seed data.
 11. [ ] Add database readiness without changing process liveness.
 12. [ ] Run final verification and complete Phase 02 records and handoff.
 
@@ -112,6 +112,13 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - Three isolated file-backed migration tests apply the migration, reapply it without losing data, verify foreign-key and trigger rejection, then downgrade/re-upgrade. Focused **3 passed**; full suite **113 passed**. Ruff, lock, and dependency results are in the build log.
 - SQLite schema-drift autogeneration still reports false unique-constraint remove/add operations because SQLite reflection does not preserve enough constraint identity. The explicit migration and applied-schema tests are the verification for this initial revision. Seed data, readiness, and Phase 02 acceptance completion remain pending; Step 10 requires the user's instruction.
 
+### Step 10 evidence - 2026-10-29
+
+- Began from clean `main` at `e61dc05` after the user committed Step 9. Added `mortgage_pricing.seed` with four fixed fictional users (two relationship managers and two reviewers) and three fixed fictional applications. `SYN-MORTGAGE-DEMO-CLEAN` is reserved without a request for the create/approve demonstration.
+- `seed_database(settings)` runs in one transaction after migrations. Repeating it inserts no duplicates and does not alter unrelated records. A collision involving a seed UUID or technical identifier raises `SeedConflictError` and rolls back; this prevents silent changes to existing work. It creates no requests, versions, decisions, or history events.
+- The command is `uv run --locked python -m mortgage_pricing.seed` after `uv run --locked python -m alembic upgrade head`. It writes only a JSON success/failure event and outcome metadata; record contents are not logged. Five isolated file-backed tests verify repeatability, clean demo state, unrelated-data preservation, collision rollback, failure against an unmigrated database, and the module command's safe output. Focused **5 passed**; full suite **118 passed**. Static/dependency checks are in the build log.
+- No normal database was opened during verification. API readiness and the final phase acceptance/handover remain pending; Step 11 requires the user's instruction.
+
 ## Implementation tasks
 
 - [x] Define users/role membership and mortgage applications with a documented manager-ownership relationship.
@@ -121,7 +128,7 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - [x] Define database constraints for relationships, unique version numbers, caller/key uniqueness, and at most one decision per version.
 - [x] Establish explicit session/transaction lifetime and SQLite foreign-key/transaction configuration. Document limitations and lock handling.
 - [x] Create and verify the initial Alembic migration. Do not rely on wiping the database to evolve the schema.
-- [ ] Add repeatable seed data: at least two managers, two reviewers, and three clearly fictional applications. Reserve a clean application for the create/approve demo.
+- [x] Add repeatable seed data: at least two managers, two reviewers, and three clearly fictional applications. Reserve a clean application for the create/approve demo.
 - [ ] Optionally include clearly fictional approved/declined examples, with coherent historical versions/events rather than fabricated live decisions.
 - [ ] Add database access to core readiness; keep process liveness separate and avoid optional AI dependencies.
 - [ ] Add seed/migration operational logs without sensitive record dumps.
