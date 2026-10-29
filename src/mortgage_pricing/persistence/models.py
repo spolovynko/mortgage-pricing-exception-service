@@ -131,6 +131,7 @@ class PricingRequest(Base):
             ["id", "current_version_number"],
             ["request_versions.request_id", "request_versions.version_number"],
             ondelete="RESTRICT",
+            use_alter=True,
         ),
     )
 

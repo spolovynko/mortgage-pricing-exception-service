@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: Phase 01 complete. Phase 02 Steps 1-8 are complete; atomic create, revise, and decide persistence operations are verified and the initial migration is next. See [project status](project-status.md).
+Status: Phase 01 complete. Phase 02 Steps 1-9 are complete; the initial Alembic migration is verified and repeatable synthetic seed data is next. See [project status](project-status.md).
 
 This plan implements the requirements and the user's agreed additions: a Python UI, optional local AI, automatic model setup, operational logging, central configuration, and one application Dockerfile with one Compose file.
 

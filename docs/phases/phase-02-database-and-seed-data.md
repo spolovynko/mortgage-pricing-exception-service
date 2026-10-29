@@ -1,9 +1,9 @@
 # Phase 02 - Database and seed data
 
-- Status: In progress; execution Steps 1-8 complete. Step 9 requires the user's instruction.
+- Status: In progress; execution Steps 1-9 complete. Step 10 requires the user's instruction.
 - Milestone: MVP1.
 - Prerequisite: Phase 01 complete or its unmet criteria explicitly resolved.
-- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 8 only.
+- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 9 only.
 - Handoff to create: `docs/handoffs/phase-02.md`.
 
 ## Objective
@@ -30,7 +30,7 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 6. [x] Define decisions and append-only history.
 7. [x] Define caller-scoped idempotency records.
 8. [x] Define and verify atomic operation boundaries.
-9. [ ] Create and verify the initial Alembic migration.
+9. [x] Create and verify the initial Alembic migration.
 10. [ ] Add repeatable synthetic seed data.
 11. [ ] Add database readiness without changing process liveness.
 12. [ ] Run final verification and complete Phase 02 records and handoff.
@@ -105,15 +105,22 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - Each operation makes a no-op update to its existing application or request as its first SQL statement. On SQLite this obtains the writer lock before reading mutable state; competing writers serialize or receive a bounded lock error. No automatic retry is claimed. Eight isolated file-backed tests cover replay/conflict, exact versions, permissions, stale/duplicate decisions, rollback of partial creation and decision/history, competing revisions/decisions, and lock contention. Focused **8 passed**; full suite **110 passed**. Static/dependency checks are in the build log.
 - Schema still exists only in test-owned temporary databases. Step 9 must migrate it and protect immutable rows against direct SQL. API error mapping, endpoints, seeds, and readiness remain pending. Phase acceptance remains unchecked; Step 9 requires the user's instruction.
 
+### Step 9 evidence - 2026-10-29
+
+- Began from clean `main` at `dac5937` after the user committed Step 8. Added Alembic configuration and the initial explicit migration for every Phase 02 table, relationship, unique constraint, and check constraint. Operational setup now uses `DATABASE_URL` through validated `Settings`; it does not call test-only metadata creation.
+- SQLite triggers reject direct `UPDATE` and `DELETE` statements against submitted versions, decisions, history events, and creation idempotency records. The migration is revision `20261029_0001`; downgrade removes its triggers and tables. The request/current-version cyclic foreign key is marked as deferred metadata for future migration tooling while retaining the SQLite constraint.
+- Three isolated file-backed migration tests apply the migration, reapply it without losing data, verify foreign-key and trigger rejection, then downgrade/re-upgrade. Focused **3 passed**; full suite **113 passed**. Ruff, lock, and dependency results are in the build log.
+- SQLite schema-drift autogeneration still reports false unique-constraint remove/add operations because SQLite reflection does not preserve enough constraint identity. The explicit migration and applied-schema tests are the verification for this initial revision. Seed data, readiness, and Phase 02 acceptance completion remain pending; Step 10 requires the user's instruction.
+
 ## Implementation tasks
 
 - [x] Define users/role membership and mortgage applications with a documented manager-ownership relationship.
 - [x] Define a logical request unique per application, submitted versions, current-version reference, decisions, and history events.
 - [x] Define caller-scoped idempotency storage: key, canonical input fingerprint, and the original creation result/reference.
 - [x] Decide how exact version input and actor/time metadata are preserved through application operations.
-- [ ] Define database constraints for relationships, unique version numbers, caller/key uniqueness, and at most one decision per version.
+- [x] Define database constraints for relationships, unique version numbers, caller/key uniqueness, and at most one decision per version.
 - [x] Establish explicit session/transaction lifetime and SQLite foreign-key/transaction configuration. Document limitations and lock handling.
-- [ ] Create and verify the initial Alembic migration. Do not rely on wiping the database to evolve the schema.
+- [x] Create and verify the initial Alembic migration. Do not rely on wiping the database to evolve the schema.
 - [ ] Add repeatable seed data: at least two managers, two reviewers, and three clearly fictional applications. Reserve a clean application for the create/approve demo.
 - [ ] Optionally include clearly fictional approved/declined examples, with coherent historical versions/events rather than fabricated live decisions.
 - [ ] Add database access to core readiness; keep process liveness separate and avoid optional AI dependencies.
