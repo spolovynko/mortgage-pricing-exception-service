@@ -1,6 +1,6 @@
 # Phase 01 - Foundation, configuration, and logging
 
-- Status: In progress (Step 2 project setup verified; phase incomplete).
+- Status: In progress (Steps 2-3 project setup and development checks verified; phase incomplete).
 - Milestone: MVP1.
 - Prerequisite: documentation scaffold; inspect actual repository state.
 - Primary ADR to create: `docs/adr/0001-foundation-config-logging.md`.
@@ -30,7 +30,7 @@ Establish the installable `mortgage_pricing` package under src/, tests/, UI entr
 - [ ] Bound/validate supplied correlation identifiers, return the operation identifier to callers, and avoid raw body/secret logging.
 - [ ] Establish a consistent error envelope. Unexpected failures receive a safe response and useful server-side diagnostics.
 - [ ] Create a minimal UI entry point if helpful, labelled as a scaffold rather than a working request workflow.
-- [ ] Establish formatting/lint and test commands; document dependency installation before showing runnable commands.
+- [x] Establish formatting/lint and test commands; document dependency installation before showing runnable commands.
 
 ## Verification
 
@@ -38,7 +38,9 @@ Establish the installable `mortgage_pricing` package under src/, tests/, UI entr
 
 The user requested one agreed step at a time. Step 1 inspected the baseline. Step 2 now supplies Python 3.12 metadata, a `src/mortgage_pricing` package, uv locking, and an isolated installation. `uv sync --locked`, `uv lock --check`, `uv pip check`, and isolated package/runtime imports passed on Windows/CPython 3.12.12. See [ADR 0001](../adr/0001-foundation-config-logging.md) and [README](../../README.md) for rationale and commands.
 
-Next is Step 3: configure development checks. No API, settings implementation, logging, error handling, tests, or lint configuration has been created. All phase acceptance criteria below remain unchecked; installation alone does not complete the runnable-API criterion. The phase handoff will be written at phase completion.
+Step 3 now adds pytest/Ruff as locked development dependencies, configuration in `pyproject.toml`, documented commands, and one packaging integration test under `tests/`. `uv run --locked python -m pytest` observed **1 passed**. Ruff lint/format checks, lock consistency, and installed-dependency consistency passed. The test checks installation from a temporary working directory using an isolated interpreter; it does not exercise application behavior.
+
+Next is Step 4: central configuration. No API, settings implementation, logging, or error handling has been created. All phase acceptance criteria below remain unchecked; tooling and a packaging test do not complete the foundation's behavioral criteria. The phase handoff will be written at phase completion.
 
 Test settings defaults, environment overrides, invalid values, isolated test settings, health responses, correlation propagation, and safe error/log behaviour. Tests must not require a real database, Docker, an external network, or a model.
 

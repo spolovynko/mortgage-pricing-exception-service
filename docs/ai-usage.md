@@ -44,3 +44,11 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Human review: implementation authorisation was provided; review/acceptance of the resulting code and documents is not recorded. All output inspection described here was by the assistant.
 - Limits: no application behavior tests or lint checks were configured/run; only packaging/import compatibility was checked, on Windows/CPython 3.12.12. Phase 01 remains incomplete. No active work duration, production suitability, or model quality is claimed.
 - Related records: [ADR 0001](adr/0001-foundation-config-logging.md), [phase guide](phases/phase-01-foundation-config-logging.md), [project status](project-status.md). Next step is development-check configuration; no commit or push made.
+
+## 2026-10-29 - Phase 01, Step 3: development checks
+
+- Task/scope: implement Step 3 only. Assistant inspected a clean working tree at `d135997`, current project configuration, phase instructions, and existing records before editing.
+- Contribution: added pytest/Ruff as locked development dependencies, configured test/lint/format commands, and wrote one packaging integration test using an isolated interpreter outside the repository working directory. Updated README and incremental decision/status/checklist records. Used PowerShell, uv, Python, pytest, Ruff, Git, and official pytest/Ruff documentation; no subagents or product-model calls.
+- Actual verification: pytest **1 passed**; Ruff lint and format checks passed; lock/dependency consistency passed. Ruff's file listing confirmed intended configuration/source/test discovery. Exact commands and final static checks are recorded in the build log.
+- Review/limits: assistant inspected generated output and actual tool results. Human acceptance of Step 3 is not recorded. The test verifies installed-package availability and distribution metadata; it establishes no API/configuration/logging/business behavior. Only Windows/CPython 3.12.12 was tested; no duration or production/model-quality claim is made.
+- Continuation: Step 4 remains unstarted; Phase 01 remains incomplete. The assistant created no commits or pushes.

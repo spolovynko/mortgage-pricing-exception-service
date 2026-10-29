@@ -2,15 +2,17 @@
 
 - Date: 2026-10-29 (Europe/Brussels).
 - Phase / milestone: 01 / MVP1.
-- Status: Implemented for Step 2 project setup only.
-- Implementation state: partial phase; project setup verified, remaining foundation decisions pending.
-- Decision owner or contributor: Codex assistant within the user's Step 2 request.
+- Status: Implemented for Steps 2-3 project setup and development checks only.
+- Implementation state: partial phase; project setup and development checks verified, remaining foundation decisions pending.
+- Decision owner or contributor: Codex assistant within the user's separate Step 2 and Step 3 requests.
 - Human acceptance: not recorded for the resulting implementation.
 - Related requirements and phase guide: NFR-01, NFR-03, DEL-01/02/03; [Phase 01](../phases/phase-01-foundation-config-logging.md).
 
 ## Context
 
 The repository was a clean documentation scaffold on `main` at `4e756fe`. The user requested incremental work and authorised only Step 2: Python baseline, dependency workflow, project metadata, installable package, virtual environment, and minimal dependencies. API/configuration/logging and development checks remain later steps. Python 3.12 is the planning baseline; it and uv are already installed locally.
+
+Step 3 was subsequently requested separately. Its initial working tree was clean, with Step 2 committed as `d135997`. The authorised addition is development-check tooling and verification; configuration/API implementation remains deferred.
 
 ## Options considered
 
@@ -25,7 +27,9 @@ The repository was a clean documentation scaffold on `main` at `4e756fe`. The us
 - Use the Python 3.12 series: `.python-version` selects it and `requires-python = ">=3.12,<3.13"` bounds the supported series. Verification used the available CPython 3.12.12; this is not a claim that the patch is the newest release.
 - Use uv 0.11.6 with `pyproject.toml` and `uv.lock`. `uv sync --locked` creates `.venv` and an editable installation, rejecting stale lock metadata. Runtime resolutions/hashes are recorded in `uv.lock`; Hatchling 1.30.1 is the pinned build backend. Do not maintain a second dependency list.
 - Use a `src/mortgage_pricing` package, currently containing only `__init__.py`. The distribution name is `mortgage-pricing-exception-service`, version `0.1.0`; the import name uses underscores. No unused application layers are created.
-- Install only FastAPI, Uvicorn, and Pydantic Settings, plus their resolved transitive dependencies. These prepare the agreed foundation without implementing it. Add pytest/Ruff and their configuration in Step 3. Preserve the existing .gitignore, which already excludes `.venv` and bytecode.
+- Runtime dependencies remain FastAPI, Uvicorn, and Pydantic Settings, plus their resolved transitive dependencies. These prepare the agreed foundation without implementing it. Step 3 adds pytest and Ruff in the `dev` dependency group with their resolved versions in the same lockfile. Preserve the existing .gitignore, which already excludes `.venv`, bytecode, and tool caches.
+- Configure pytest discovery under `tests/`, `importlib` import mode, strict configuration/markers, and warnings as errors. Do not add a `pythonpath` workaround. A packaging integration test runs an isolated interpreter from a temporary directory, checking that imports and distribution metadata work independently of the repository working directory. No placeholder API or synthetic business test is needed at this step.
+- Configure Ruff in `pyproject.toml` for Python 3.12, a 100-character line length, and `E`, `F`, `I`, `UP`, `B`, `SIM` lint groups. Use the same tool for formatting. Run tools through `uv run --locked python -m ...` so project versions are selected consistently; do not add CI or pre-commit automation in this step.
 
 Configuration precedence, tracing, error/log contracts, demo identity behavior, and UI location decisions will be added when their steps are implemented. No business policy changed.
 
@@ -35,12 +39,22 @@ The package imports through an isolated virtual environment and normal setup reu
 
 ## Verification and evidence
 
+### Step 2 evidence
+
 - `uv lock`: resolved 17 packages from the public PyPI index, including this project.
 - `uv sync --locked`: created a fresh `.venv` with CPython 3.12.12 and installed all 17 packages, including the editable project.
 - `uv lock --check`: passed. `uv pip check`: all installed packages compatible.
 - `uv run --locked python -I -c "import mortgage_pricing, fastapi, pydantic_settings, uvicorn; print(mortgage_pricing.__file__)"`: imports passed; the package resolves to this repository's `src/mortgage_pricing/__init__.py`. An extended check asserted Python 3.12 and `sys.prefix != sys.base_prefix`, confirming the virtual environment.
 - `git check-ignore .venv/pyvenv.cfg src/mortgage_pricing/__pycache__/__init__.cpython-312.pyc`: both generated paths are ignored.
 - Limits: installation/import/dependency checks only, on Windows/CPython 3.12.12. No test suite, linter configuration, API, or model was run. Phase 01 remains incomplete. See the [build log](../build-log.md) for actual observations.
+
+### Step 3 evidence
+
+- `uv add --dev "pytest>=8,<10" "ruff>=0.9,<1"`: installed pytest 9.2.0 and Ruff 0.17.3 plus their transitive dependencies; 24 total locked packages including this project.
+- `uv run --locked python -m pytest`: **1 passed**, the isolated installed-package/distribution check. No external network, storage service, or model is used.
+- `uv run --locked python -m ruff check .`: all checks passed. `uv run --locked python -m ruff format --check .`: passed.
+- `uv lock --check` and `uv pip check`: passed. `ruff check --show-files` confirmed discovery includes the project configuration, source package, and test file.
+- Limits: Windows/CPython 3.12.12 only; no configuration/health/logging/error behavior or business workflow has been tested. Strict warning handling may expose future dependency deprecations; address observed issues specifically rather than broadly suppressing warnings. Phase 01 acceptance remains incomplete.
 
 ## Alternatives rejected and revisit conditions
 
@@ -55,4 +69,6 @@ This step establishes development packaging, not production deployment or securi
 - [Phase guide](../phases/phase-01-foundation-config-logging.md), [requirements](../requirements.md), [engineering guidelines](../python-engineering-guidelines.md), [AGENTS.md](../../AGENTS.md).
 - [Python version lifecycle](https://devguide.python.org/versions/) lists 3.12 in security support.
 - [uv locking and syncing](https://docs.astral.sh/uv/concepts/projects/sync/) documents editable installs and stale-lock rejection with `--locked`.
+- [pytest integration practices](https://docs.pytest.org/en/stable/explanation/goodpractices.html) describes virtual-environment installation, development dependency groups, and import-mode choices.
+- [Ruff configuration](https://docs.astral.sh/ruff/configuration/) documents project configuration and source discovery.
 - No prior ADR is superseded.
