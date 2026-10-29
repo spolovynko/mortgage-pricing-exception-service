@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
 import streamlit as st
 
@@ -49,8 +50,126 @@ def _show_version(
         )
 
 
-def _render_requests(client: Any, login: str, applications: list[dict[str, Any]]) -> None:
+def _post(client: Any, path: str, login: str, payload: dict[str, Any], **kwargs: Any) -> Any:
+    return client.request("POST", path, login=login, json=payload, **kwargs)
+
+
+def _render_create(client: Any, login: str, applications: list[dict[str, Any]]) -> None:
+    owned = [
+        application for application in applications if application["manager_id"] == _user_id(login)
+    ]
+    if not owned:
+        st.info("This demo user does not own an application and cannot submit a request.")
+        return
+    st.subheader("Create request")
+    with st.form("create_request_form"):
+        app_labels = {item["reference"]: item["id"] for item in owned}
+        application = st.selectbox("Application", list(app_labels))
+        discount = st.text_input("Discount (basis points)")
+        reason = st.text_area("Reason (1–2,000 characters)")
+        submitted = st.form_submit_button("Submit request")
+    if submitted:
+        try:
+            amount = int(discount)
+            if str(amount) != discount.strip() or amount <= 0:
+                raise ValueError
+        except ValueError:
+            st.error("Enter a positive whole number of basis points.")
+            return
+        intents = st.session_state.setdefault("create_intents", {})
+        intent = intents.get(login)
+        payload = {
+            "application_id": app_labels[application],
+            "discount_bps": amount,
+            "reason": reason,
+        }
+        if intent is None:
+            intent = {"key": str(uuid4()), "payload": payload}
+            intents[login] = intent
+        elif intent["payload"] != payload:
+            st.warning(
+                "A previous submission is unresolved. Retry it or start a new submission first."
+            )
+            return
+        _send_create(client, login, intent)
+    intent = st.session_state.get("create_intents", {}).get(login)
+    if intent:
+        st.warning(
+            "A submission may not have completed. Retry with the same saved details and key."
+        )
+        if st.button("Retry submission", key=f"retry_create_{login}"):
+            _send_create(client, login, intent)
+        if st.button("Start a new submission", key=f"new_create_{login}"):
+            st.session_state["create_intents"].pop(login, None)
+            st.info("Retry cleared. Enter a new request to create a new submission intent.")
+
+
+def _user_id(login: str) -> str:
+    users = st.session_state.get("demo_users", [])
+    return next((user["id"] for user in users if user["login"] == login), "")
+
+
+def _send_create(client: Any, login: str, intent: dict[str, Any]) -> None:
+    try:
+        result = _post(
+            client,
+            "/requests",
+            login,
+            intent["payload"],
+            headers={"Idempotency-Key": intent["key"]},
+        )
+    except ApiError as exc:
+        _show_error(exc)
+        st.warning("Saved submission details and retry key are retained for this demo user.")
+        return
+    st.session_state["create_intents"].pop(login, None)
+    st.success(f"Submitted: {result['request_id']} · version {result['version_number']}.")
+
+
+def _render_revision(client: Any, login: str, detail: dict[str, Any]) -> None:
+    version = detail["current_version"]
+    if version["submitted_by_login"] != login or version["status"] == "pending":
+        return
+    st.subheader("Revise terms")
+    st.info("A revision creates a new pending version that needs fresh review.")
+    with st.form(f"revision_form_{detail['request_id']}_{version['version_number']}"):
+        discount = st.text_input("New discount (basis points)")
+        reason = st.text_area("Reason for revised terms (1–2,000 characters)")
+        submitted = st.form_submit_button("Submit revision")
+    if submitted:
+        try:
+            amount = int(discount)
+            if str(amount) != discount.strip() or amount <= 0:
+                raise ValueError
+        except ValueError:
+            st.error("Enter a positive whole number of basis points.")
+            return
+        try:
+            result = _post(
+                client,
+                f"/requests/{detail['request_id']}/revisions",
+                login,
+                {
+                    "expected_version": version["version_number"],
+                    "discount_bps": amount,
+                    "reason": reason,
+                },
+            )
+        except ApiError as exc:
+            _show_error(exc)
+            st.warning(
+                "No automatic retry was made. Refresh the request to check its current version."
+            )
+            return
+        st.success(f"Revision submitted as pending version {result['version_number']}.")
+
+
+def _render_requests(
+    client: Any, login: str, applications: list[dict[str, Any]], *, is_manager: bool
+) -> None:
     st.header("Requests")
+    if is_manager:
+        _render_create(client, login, applications)
     application_options = {"All applications": None} | {
         application["reference"]: application["id"] for application in applications
     }
@@ -101,6 +220,8 @@ def _render_requests(client: Any, login: str, applications: list[dict[str, Any]]
         title="Current submitted terms",
         reason_key=f"request_reason_{detail['request_id']}_{detail['current_version_number']}",
     )
+    if is_manager:
+        _render_revision(client, login, detail)
 
 
 def _render_review(client: Any, login: str, rows: list[dict[str, Any]]) -> None:
@@ -163,6 +284,7 @@ def main(client=None) -> None:
         if not users:
             st.error("The API returned no demo users.")
             return
+        st.session_state["demo_users"] = users
         user_by_label = {f"{user['display_name']} ({user['login']})": user for user in users}
         previous_login = st.session_state.get("demo_login")
         previous = next(
@@ -202,7 +324,9 @@ def main(client=None) -> None:
             screen_options.remove("Review")
         screen = st.sidebar.radio("Navigate", screen_options, key="navigation")
         if screen == "Requests":
-            _render_requests(client, login, applications)
+            _render_requests(
+                client, login, applications, is_manager="relationship_manager" in roles
+            )
         elif screen == "Review":
             _render_review(client, login, requests)
         else:
