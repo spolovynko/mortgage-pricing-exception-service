@@ -4,7 +4,7 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 ## Current state
 
-Phase 01 is in progress. Steps 2-5 supply an installable `mortgage_pricing` package, an isolated Python environment, locked dependencies, development checks, validated central configuration, and a minimal API with a process health endpoint. Structured logging, business endpoints, UI, Dockerfile, Compose configuration, and model setup have **not** been implemented.
+Phase 01 is in progress. Steps 2-6 supply the Python package and development tools, validated configuration, a minimal health API, and structured request logging with correlation IDs. Consistent error responses, business endpoints, UI, containers, and model integration remain pending.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -60,7 +60,7 @@ Accepted modes and bounds are validated while constructing `Settings`. Supported
 The API uses a factory, so Uvicorn can construct an app and load validated settings at startup:
 
 ```powershell
-uv run --locked uvicorn mortgage_pricing.main:create_app --factory --host 127.0.0.1 --port 8000
+uv run --locked uvicorn mortgage_pricing.main:create_app --factory --host 127.0.0.1 --port 8000 --log-config config/logging.json --no-access-log
 ```
 
 Check process liveness at `http://127.0.0.1:8000/health`; the response is `{"status":"ok"}`. This is process liveness only and does not indicate database or model readiness.
@@ -71,11 +71,21 @@ Verify configuration and the API with:
 uv run --locked python -m pytest
 ```
 
-## Start here
+## Structured logging (Step 6)
+
+Application logs go to stdout as JSON with UTC `timestamp`, `level`, `event`, `correlation_id`, `outcome`, and `duration` (seconds). Request completion adds method, matched route template, and status. Domain IDs are supported when later features supply them. `LOG_LEVEL` controls application logs; `WARNING` and higher omit successful request logs. Uvicorn's JSON configuration above covers server messages; `--no-access-log` disables its raw access log to avoid recording URLs and query strings twice.
+
+Send an optional `X-Correlation-ID` header: one value of 1-64 ASCII letters, digits, dots, underscores, or hyphens, starting with a letter or digit. Missing, invalid, and duplicate values receive a generated UUID. The ID is returned in the response header and applied to logs during that request. For example, `Invoke-WebRequest http://127.0.0.1:8000/health -Headers @{'X-Correlation-ID'='demo-123'}` produces a matching response header and request log.
+
+Logs include metadata rather than bodies, query strings, headers, or raw unknown paths. Exception diagnostics include type and stack locations, excluding messages and source text. Use fixed internal event names when adding application logging. Correlation IDs do not establish identity or permission. Unhandled exceptions are logged and rethrown; their consistent HTTP response and correlation header are Step 7 work.
+
+Run the logging tests with `uv run --locked python -m pytest tests/test_logging.py`.
+
+## Continue implementation
 
 1. Read [project status](docs/project-status.md).
 2. Read [requirements](docs/requirements.md) and the [implementation plan](docs/implementation-plan.md).
-3. Continue [Phase 01](docs/phases/phase-01-foundation-config-logging.md) one agreed step at a time. Step 6 (structured logging) is next.
+3. Continue [Phase 01](docs/phases/phase-01-foundation-config-logging.md) one agreed step at a time. Step 7 (consistent, safe errors) is next.
 4. Have the agent read [AGENTS.md](AGENTS.md) before implementing that phase.
 
 Suggested phase-chat prompt:

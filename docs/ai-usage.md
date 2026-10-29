@@ -66,3 +66,10 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Contribution: authored the FastAPI factory/health response, tests, selected the Starlette-supported test-client dependency after an observed deprecation failure, and updated setup/phase/architecture/ADR/status records. Used local PowerShell, Git, uv, Uvicorn, pytest, Ruff, and project docs. No subagents or external model/API calls.
 - Actual verification: 14 pytest cases passed, Ruff lint/format, lock/dependency checks and diff check passed. A live Uvicorn `/health` request returned `{"status":"ok"}`. Exact commands and versions are in [build log](build-log.md).
 - Review/limits: assistant inspected outputs; human review/acceptance is not recorded. Endpoint proves process liveness only. No structured logging, errors, database/model readiness, cross-platform behavior, or work duration is claimed. Phase incomplete; no commit/push.
+
+## 2026-10-29 - Phase 01, Step 6: structured logging and correlation
+
+- Task/scope: Step 6 only, starting from clean Step 5 commit `5b8ed82`. Assistant inspected current app/config/tests and relevant project instructions/records before editing.
+- Contribution: selected standard-library JSON logging and pure ASGI middleware, authored code, 14 logging tests, Uvicorn log configuration, README/architecture/ADR/checklist/status updates, and evidence records. Used local PowerShell, Python, Git, uv, pytest, Ruff, and Uvicorn. No subagents or external AI/API calls.
+- Verification: 28 total tests passed; lint/format and lock/dependency checks passed. Live local Uvicorn success/404 requests returned correlation headers matching JSON logs and excluded the synthetic query secret. Exact commands/results and final review are in [build log](build-log.md).
+- Review/limits: assistant reviewed code and output; no human review/acceptance or duration is recorded. HTTP error envelopes and unhandled 500 response correlation remain Step 7 work. No business/database/model/container verification; Windows/CPython 3.12.12 only. Phase incomplete; no commit/push.

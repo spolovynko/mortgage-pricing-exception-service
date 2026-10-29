@@ -1,6 +1,6 @@
 # Phase 01 - Foundation, configuration, and logging
 
-- Status: In progress (Steps 2-5 project setup, development checks, configuration, and minimal API verified; phase incomplete).
+- Status: In progress (Steps 2-6 verified, including structured logging and correlation; phase incomplete).
 - Milestone: MVP1.
 - Prerequisite: documentation scaffold; inspect actual repository state.
 - Primary ADR to create: `docs/adr/0001-foundation-config-logging.md`.
@@ -26,8 +26,8 @@ Establish the installable `mortgage_pricing` package under src/, tests/, UI entr
 - [x] Create the minimal API application with an application factory and process health endpoint.
 - [x] Add central Pydantic Settings and .env.example. Cover application environment, log level, database URL, demo identity mode, UI API address, and reserved AI settings.
 - [x] Define `LLM_MODE=off|auto`: auto permits later capability discovery, not automatic inference. No live AI is needed in this phase.
-- [ ] Add JSON logging with timestamp, severity, event, correlation_id, outcome, and duration; domain IDs are added when available.
-- [ ] Bound/validate supplied correlation identifiers, return the operation identifier to callers, and avoid raw body/secret logging.
+- [x] Add JSON logging with timestamp, severity, event, correlation_id, outcome, and duration; domain IDs are added when available.
+- [ ] Bound/validate supplied correlation identifiers, return the operation identifier to callers, and avoid raw body/secret logging. Step 6 covers handled responses and safe request logs; unhandled 500 response correlation remains Step 7 work.
 - [ ] Establish a consistent error envelope. Unexpected failures receive a safe response and useful server-side diagnostics.
 - [ ] Create a minimal UI entry point if helpful, labelled as a scaffold rather than a working request workflow.
 - [x] Establish formatting/lint and test commands; document dependency installation before showing runnable commands.
@@ -49,6 +49,12 @@ Observed checks: `uv run --locked python -m pytest` -> **12 passed** (including 
 ### Step 5 - minimal API and health endpoint (2026-10-29)
 
 Added `create_app(settings=None)` in `src/mortgage_pricing/main.py`, a typed `GET /health` response (`{"status":"ok"}`), and API tests for the health response and isolated settings injection. Added `httpx2` to the locked dev dependencies because the resolved Starlette 1.10 TestClient deprecates legacy `httpx`; warnings are treated as errors. README now documents the Uvicorn factory command and process-liveness scope. `uv run --locked python -m pytest` -> **14 passed**; Ruff lint/format, `uv lock --check` (28 packages), `uv pip check`, and `git diff --check` passed. Started Uvicorn at `127.0.0.1:8765`; `Invoke-RestMethod http://127.0.0.1:8765/health` returned `{"status":"ok"}`. The server was stopped after the check. Windows / CPython 3.12.12. This endpoint is liveness only; it does not probe database or model readiness. Phase acceptance criteria remain unchecked pending remaining work.
+
+### Step 6 - structured logging and correlation (2026-10-29)
+
+Added standard-library JSON logging, independent per-app handlers/levels, and pure ASGI request middleware. Logs include UTC time, severity, event, correlation ID, outcome, duration in seconds, method, route template, and status. Only approved domain metadata is accepted; no raw bodies, headers, query strings, unknown paths, or exception messages/source text are emitted. Exception type and stack locations remain available. Caller IDs are bounded/validated; absent, invalid, or duplicate IDs receive UUIDs. ContextVar state is restored after requests. Handled responses return `X-Correlation-ID`; unhandled 500 responses require the Step 7 error boundary.
+
+Observed: `uv run --locked python -m pytest` -> **28 passed** (14 logging cases). Ruff lint/format, lock consistency (28 packages), and installed-dependency checks passed. Live Uvicorn using `--log-config config/logging.json --no-access-log` returned 200 `/health` and 404 `/missing?token=synthetic-secret` with matching response/log IDs (`live-success`/`live-failure`), correct outcome/severity, and no query secret in logs. The server was stopped afterward. Error envelopes and complete phase acceptance/handoff remain pending.
 
 Test settings defaults, environment overrides, invalid values, isolated test settings, health responses, correlation propagation, and safe error/log behaviour. Tests must not require a real database, Docker, an external network, or a model.
 
