@@ -87,6 +87,9 @@ class ApiClient:
             )
         return payload
 
+    def get(self, path: str, *, login: str, params: dict[str, Any] | None = None) -> Any:
+        return self.request("GET", path, login=login, params=params)
+
 
 def configured_client(settings: Any) -> ApiClient:
     """Build a client from the existing immutable application settings."""
