@@ -2,8 +2,8 @@
 
 - Date: 2026-10-29 (Europe/Brussels).
 - Phase / milestone: 02 / MVP1.
-- Status: Implemented for execution Step 2 only; Phase 02 remains in progress.
-- Implementation state: partial; resource factories/configuration verified, business storage not yet implemented.
+- Status: Implemented through execution Step 3 only; Phase 02 remains in progress.
+- Implementation state: partial; SQLite connection/transaction configuration verified, business storage not yet implemented.
 - Decision owner or contributor: Codex assistant within the user's incremental Phase 02 requests.
 - Human acceptance: not recorded for the resulting implementation.
 - Related requirements and phase guide: NFR-01/03, DEL-02/03; [Phase 02](../phases/phase-02-database-and-seed-data.md).
@@ -34,13 +34,18 @@ The project already uses immutable central settings, explicit application factor
 - Disable SQL echo and hide bound parameters in SQLAlchemy diagnostics. Do not add low-level catch/log/rethrow wrappers. Callers retain responsibility for error translation and safe logging through the established boundaries.
 - Create `create_session_factory(engine)` returning SQLAlchemy's standard `sessionmaker`. Retain normal expiration after commit. Use `with factory.begin() as session` for commit on success, rollback on failure, and session closure. Plain `with factory()` closes without implicitly committing.
 - The engine owner must close sessions/connections before calling `engine.dispose()`. Current tests own this lifecycle. API construction/shutdown wiring belongs to Step 11, when the API first owns a database resource; `main.py` is unchanged in Step 2.
+- Step 3 uses Python 3.12+ sqlite3 `autocommit=False` so SELECT, DDL, and savepoints participate in explicit transactions. An engine-local listener sets `PRAGMA foreign_keys=ON` on every DBAPI connection, temporarily enabling autocommit solely for that PRAGMA. Keep the configured busy timeout; a lock failure rolls back the attempted operation and leaves retry policy to a future business boundary. Do not enable WAL or automatic retry without a concrete workload and verification need.
 - Add ignore rules for local `data/`, SQLite database files, and journal/WAL/shared-memory sidecars. No real settings, normal database, or existing data directory is opened or removed.
 
 ## Consequences
 
 The common persistence boundary is available for later steps without adding business models or unnecessary abstraction layers. Factories can be injected and tested against separate files. Storage failures reach the calling boundary with no fabricated success.
 
-**This is an incomplete persistence foundation.** SQLite foreign keys are not yet enabled, and the driver still uses its default transaction mode. Step 3 must establish these guarantees before business writes. The basic DML commit/rollback tests do not establish DDL/savepoint behavior, relationship integrity, or competing-operation safety. Bounded lock waiting alone does not solve concurrency.
+**This is an incomplete business persistence foundation.** Connection-level integrity and transaction behavior are configured, but business models and operation-level concurrency rules are pending. Bounded lock waiting alone does not solve competing-update correctness.
+
+Step 3 configures Python 3.12+ sqlite3 with `autocommit=False`, rather than relying on the driver's legacy mode. An engine-local connection listener temporarily enables autocommit to run `PRAGMA foreign_keys=ON`, then restores the prior value. This applies to every pooled DBAPI connection before use and does not introduce import-time I/O. A short busy timeout still raises a lock error under contention; callers must end the failed transaction and choose whether a later retry is valid. Journal mode remains SQLite's default; no automatic retry or cross-process update protocol is claimed. Keep business write transactions short, and establish operation-level competing-update rules in Step 8.
+
+Five isolated file-backed tests establish FK rejection on two connections, DDL rollback without prior DML, nested savepoint rollback, released savepoint participation in outer rollback, and bounded writer contention/recovery. The Step 3 scoped persistence suite passed 16 tests; the full suite passed 67. Business schema, migrations, seeds, and API integration remain pending.
 
 Only tests create a simple probe table in pytest-owned temporary files. Application code does not create a schema. Operational schema setup must use Alembic in Step 9. The absence of a data directory will produce a storage error on connection; no implicit filesystem setup occurs here.
 
@@ -59,10 +64,10 @@ Use direct sessions until a concrete query ownership or testing need warrants an
 
 ## Production implications
 
-No production readiness, authentication, backup, audit, or multi-instance guarantee follows from these factories. The current foundation is intentionally incomplete until Step 3. Database operations must remain short; future model calls must occur outside active write transactions. Deployment lifecycle and migration sequencing require verification in their later steps/phases.
+No production readiness, authentication, backup, audit, or multi-instance guarantee follows from these factories. Business storage remains incomplete. Database operations must remain short; future model calls must occur outside active write transactions. Deployment lifecycle and migration sequencing require verification in their later steps/phases.
 
 ## References and supersession
 
 - [Phase 02 guide](../phases/phase-02-database-and-seed-data.md), [requirements](../requirements.md), [architecture](../architecture.md), [engineering guidelines](../python-engineering-guidelines.md), [AGENTS.md](../../AGENTS.md).
-- [SQLAlchemy engine configuration](https://docs.sqlalchemy.org/en/20/core/engines.html), [SQLAlchemy session contexts](https://docs.sqlalchemy.org/en/20/orm/session_basics.html), [Alembic installation and dependencies](https://alembic.sqlalchemy.org/en/latest/front.html).
+- [SQLAlchemy SQLite transactions and foreign keys](https://docs.sqlalchemy.org/en/20/dialects/sqlite.html), [SQLAlchemy engine configuration](https://docs.sqlalchemy.org/en/20/core/engines.html), [SQLAlchemy session contexts](https://docs.sqlalchemy.org/en/20/orm/session_basics.html), [Alembic installation and dependencies](https://alembic.sqlalchemy.org/en/latest/front.html).
 - [ADR 0001](0001-foundation-config-logging.md) continues to govern settings, logging, and HTTP errors. No prior ADR is superseded.

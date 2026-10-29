@@ -1,9 +1,9 @@
 # Phase 02 - Database and seed data
 
-- Status: In progress; execution Steps 1-2 complete. Step 3 requires the user's instruction.
+- Status: In progress; execution Steps 1-3 complete. Step 4 requires the user's instruction.
 - Milestone: MVP1.
 - Prerequisite: Phase 01 complete or its unmet criteria explicitly resolved.
-- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented for Step 2 only.
+- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 3 only.
 - Handoff to create: `docs/handoffs/phase-02.md`.
 
 ## Objective
@@ -24,7 +24,7 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 
 1. [x] Confirm the Phase 01 baseline and persistence boundaries.
 2. [x] Add the persistence foundation.
-3. [ ] Configure and verify SQLite transactions.
+3. [x] Configure and verify SQLite transactions.
 4. [ ] Define users, roles, mortgage applications, and manager ownership.
 5. [ ] Define logical requests and immutable submitted versions.
 6. [ ] Define decisions and append-only history.
@@ -59,6 +59,14 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - Limits: foreign-key enforcement and explicit SQLite driver transaction configuration remain Step 3. DDL/savepoint/concurrency guarantees and all Phase 02 acceptance criteria remain unverified. API storage lifecycle wiring belongs to Step 11; migrations belong to Step 9. No normal database was opened/reset. Human review and active work time are not recorded.
 - Next action: Step 3 only on user instruction. All implementation tasks below remain unchecked because their complete behavior is still pending.
 
+### Step 3 evidence - 2026-10-29
+
+- Began from a clean worktree after Step 2 was committed by the user. Configured Python 3.12+ sqlite3 `autocommit=False` for all factory connections and enabled `PRAGMA foreign_keys=ON` on each connection using an engine-local listener. The PRAGMA runs with temporary autocommit because SQLite ignores it inside a transaction. Existing timeout and session ownership remain in place.
+- Five new file-backed tests verify foreign keys on two simultaneous connections, transactional DDL rollback, nested savepoint rollback, released savepoint participation in outer rollback, and bounded competing-writer failure followed by retry after lock release. These tests use only pytest-owned temporary files and probe tables.
+- `uv run --locked python -m pytest tests/persistence -q`: **16 passed**. Full `uv run --locked python -m pytest -q`: **67 passed**. Final lint/format and dependency checks are recorded in the build log.
+- The writer test establishes a bounded lock error and manual retry after release; it does not claim automatic retry, multi-process safety, or a complete competing-update protocol. Business models, migrations, seeds, and API readiness remain pending. The session/SQLite configuration task is checked; atomic business operation boundaries remain unchecked until Step 8. No phase acceptance criterion is complete.
+- Next action: Step 4 only on user instruction.
+
 ## Implementation tasks
 
 - [ ] Define users/role membership and mortgage applications with a documented manager-ownership relationship.
@@ -66,7 +74,7 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - [ ] Define caller-scoped idempotency storage: key, canonical input fingerprint, and the original creation result/reference.
 - [ ] Decide how exact version input and actor/time metadata are preserved through application operations.
 - [ ] Define database constraints for relationships, unique version numbers, caller/key uniqueness, and at most one decision per version.
-- [ ] Establish explicit session/transaction lifetime and SQLite foreign-key/transaction configuration. Document limitations and lock handling.
+- [x] Establish explicit session/transaction lifetime and SQLite foreign-key/transaction configuration. Document limitations and lock handling.
 - [ ] Create and verify the initial Alembic migration. Do not rely on wiping the database to evolve the schema.
 - [ ] Add repeatable seed data: at least two managers, two reviewers, and three clearly fictional applications. Reserve a clean application for the create/approve demo.
 - [ ] Optionally include clearly fictional approved/declined examples, with coherent historical versions/events rather than fabricated live decisions.

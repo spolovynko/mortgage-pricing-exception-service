@@ -1,6 +1,6 @@
 # Proposed architecture
 
-Status: Phase 01 foundation and Phase 02 Step 2 persistence resource factories implemented; broader application architecture remains a design baseline. Update this document as phases complete. Use ADRs for the rationale behind decisions.
+Status: Phase 01 foundation and Phase 02 Steps 2-3 persistence resource/SQLite transaction configuration implemented; broader application architecture remains a design baseline. Update this document as phases complete. Use ADRs for the rationale behind decisions.
 
 Phase 01 completed (2026-10-29): packaging, Python 3.12/uv setup, configuration, `/health`, request tracing, and safe error responses are implemented and verified with a fresh environment and 48 passing tests. Business components and dependency readiness probes remain planned. See [ADR 0001](adr/0001-foundation-config-logging.md) and the [handoff](handoffs/phase-01.md). The optional UI stub was omitted; `ui/app.py` remains a Phase 04 entry-point location.
 
@@ -56,7 +56,7 @@ Use application factories and explicit dependencies where useful to isolate test
 
 Phase 02 Step 2 adds shared empty SQLAlchemy metadata with stable constraint names, a lazy SQLite engine factory, and an explicit session factory under `persistence/`. There are no global engines/sessions or import-time connections. Central settings supply the URL and `SQLITE_BUSY_TIMEOUT_SECONDS` (default 5; greater than 0 and at most 30). PostgreSQL URL forms remain reserved configuration; the factory rejects them before driver loading. SQL echo is off and parameter values are hidden in SQLAlchemy exception text. See [ADR 0002](adr/0002-database-and-seed-data.md).
 
-The owner closes sessions/connections before engine disposal. Each operation owns one session; `factory.begin()` provides basic commit/rollback/closure, while a plain session context does not implicitly commit. Application lifecycle wiring is Step 11; the current API does not instantiate these resources. Step 3 must enable/verify foreign keys and establish explicit SQLite driver transaction behavior before business writes. Tests currently use only temporary probe tables; no business schema, migration, seed, or readiness exists. The following describes the planned data behavior:
+The owner closes sessions/connections before engine disposal. Each operation owns one session; `factory.begin()` provides commit/rollback/closure, while a plain session context does not implicitly commit. Step 3 sets sqlite3 `autocommit=False` and enables foreign keys on every connection. Temporary file-backed tests verify transactional DDL/savepoints, FK rejection, and bounded writer lock errors; the application has no automatic retry. Application lifecycle wiring is Step 11; the current API does not instantiate these resources. Tests use only temporary probe tables; no business schema, migration, seed, or readiness exists. The following describes the planned data behavior:
 
 A logical request belongs to an application and contains numbered versions. A current-version reference identifies the version eligible for review/use. Each version preserves submitted input; a decision refers to one version. History events and idempotency records are persisted with their associated business operations.
 
