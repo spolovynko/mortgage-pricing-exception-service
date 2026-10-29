@@ -2,7 +2,7 @@
 
 ADRs explain a consequential choice, its alternatives, and its trade-offs. Use the [template](template.md). Create at least one primary record per phase, plus additional records for distinct decisions that need their own explanation.
 
-ADR 0001 records the implemented Steps 2-4 project setup, development checks, and central configuration. The rest of Phase 01 remains unimplemented. Planning proposals are in [requirements](../requirements.md) and [architecture](../architecture.md); they are not retrospective evidence of implementation.
+ADR 0001 records the implemented Steps 2-5 project setup, development checks, central configuration, and minimal API. The rest of Phase 01 remains unimplemented. Planning proposals are in [requirements](../requirements.md) and [architecture](../architecture.md); they are not retrospective evidence of implementation.
 
 ## Primary phase records
 
@@ -10,7 +10,7 @@ Reserve these names for the primary phase records. Create the file during the ph
 
 | Phase | Expected primary ADR | Current state |
 | --- | --- | --- |
-| 01 | [0001-foundation-config-logging.md](0001-foundation-config-logging.md) | Implemented: Steps 2-4 only; phase incomplete |
+| 01 | [0001-foundation-config-logging.md](0001-foundation-config-logging.md) | Implemented: Steps 2-5 only; phase incomplete |
 | 02 | `0002-database-and-seed-data.md` | Not created |
 | 03 | `0003-business-rules-and-api.md` | Not created |
 | 04 | `0004-user-interface.md` | Not created |

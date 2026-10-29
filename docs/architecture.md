@@ -1,8 +1,8 @@
 # Proposed architecture
 
-Status: Project packaging implemented; application architecture remains a design baseline. Update this document as phases complete. Use ADRs for the rationale behind decisions.
+Status: Project packaging, validated configuration, minimal API factory, and process liveness implemented; broader application architecture remains a design baseline. Update this document as phases complete. Use ADRs for the rationale behind decisions.
 
-Step 2 progress (2026-10-29): the installable `src/mortgage_pricing` package and Python 3.12/uv dependency setup now exist, verified by installation and isolated imports. Only `__init__.py` exists in the package. The components, executable modules, and behavior below remain planned. See [ADR 0001](adr/0001-foundation-config-logging.md).
+Phase 01 progress (2026-10-29): the installable package, Python 3.12/uv setup, immutable configuration, and a FastAPI app factory with `/health` liveness endpoint are implemented. Business components, readiness probes, logging, and error behavior remain planned. See [ADR 0001](adr/0001-foundation-config-logging.md).
 
 ## Components and boundaries
 

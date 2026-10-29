@@ -4,7 +4,7 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 ## Current state
 
-Phase 01 is in progress. Steps 2-4 supply an installable `mortgage_pricing` package, an isolated Python environment, locked dependencies, development checks, and validated central configuration. The API, structured logging, UI, Dockerfile, Compose configuration, and model setup have **not** been implemented; application behavior remains mostly untested.
+Phase 01 is in progress. Steps 2-5 supply an installable `mortgage_pricing` package, an isolated Python environment, locked dependencies, development checks, validated central configuration, and a minimal API with a process health endpoint. Structured logging, business endpoints, UI, Dockerfile, Compose configuration, and model setup have **not** been implemented.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -30,7 +30,7 @@ uv pip check
 uv run --locked python -I -c "import mortgage_pricing, fastapi, pydantic_settings, uvicorn; print(mortgage_pricing.__file__)"
 ```
 
-No activation is required. Python's `-I` mode excludes the current directory and `PYTHONPATH`, so the import checks the installed package. The package currently contains its initializer and central settings model; no server command exists yet. Runtime dependencies are FastAPI, Uvicorn, and Pydantic Settings. pytest and Ruff are development dependencies in the `dev` group, installed by the setup command above.
+No activation is required. Python's `-I` mode excludes the current directory and `PYTHONPATH`, so the import checks the installed package. The package contains its initializer, central settings model, and FastAPI app factory. Runtime dependencies are FastAPI, Uvicorn, and Pydantic Settings. pytest, Ruff, and the Starlette-compatible `httpx2` test client are development dependencies in the `dev` group, installed by the setup command above.
 
 For deliberate dependency changes, use `uv add <package>` and review both dependency files. Normal setup uses `--locked` so stale metadata fails rather than silently updating the lock. See [ADR 0001](docs/adr/0001-foundation-config-logging.md) for rationale and verification limits.
 
@@ -47,7 +47,7 @@ uv run --locked python -m ruff format --check .
 
 These commands use the locked project tools, rather than whichever pytest or Ruff is installed globally. Tested versions: pytest 9.2.0 and Ruff 0.17.3 on Windows/CPython 3.12.12. To apply formatting, use `uv run --locked python -m ruff format .`.
 
-pytest discovers `tests/`, uses `importlib` import mode without adding a source path, rejects unknown configuration/markers, and treats warnings as errors. The current test launches an isolated Python process from a temporary directory and verifies both package import and installed distribution metadata. It needs no network, database, Docker, or model. This is a packaging integration check; behavioral tests will accompany the later features.
+pytest discovers `tests/`, uses `importlib` import mode without adding a source path, rejects unknown configuration/markers, and treats warnings as errors. Tests cover isolated package installation/import, validated configuration, and the API factory/health endpoint. They need no database, Docker, or model. The live Uvicorn check is documented below and was verified separately.
 
 Ruff targets Python 3.12 with a 100-character line length. Enabled rule groups check common style errors (`E`), undefined/unused names and imports (`F`), import ordering (`I`), Python modernization (`UP`), likely bug patterns (`B`), and simplifications (`SIM`). The existing .gitignore covers pytest/Ruff caches and Python bytecode.
 
@@ -57,17 +57,25 @@ Ruff targets Python 3.12 with a 100-character line length. Enabled rule groups c
 
 Accepted modes and bounds are validated while constructing `Settings`. Supported environment values are development/test/production; log levels DEBUG/INFO/WARNING/ERROR/CRITICAL; demo identity off/header; and LLM mode off/auto. `auto` reserves capability discovery only; it does not run assessment inference. The database URL currently accepts SQLite and PostgreSQL schemes, without connecting to or creating a database. AI settings are configuration only; no model integration is implemented. When service containers are added, their addresses will need container-specific overrides.
 
-Verify configuration with:
+The API uses a factory, so Uvicorn can construct an app and load validated settings at startup:
 
 ```powershell
-uv run --locked python -m pytest tests/test_config.py
+uv run --locked uvicorn mortgage_pricing.main:create_app --factory --host 127.0.0.1 --port 8000
+```
+
+Check process liveness at `http://127.0.0.1:8000/health`; the response is `{"status":"ok"}`. This is process liveness only and does not indicate database or model readiness.
+
+Verify configuration and the API with:
+
+```powershell
+uv run --locked python -m pytest
 ```
 
 ## Start here
 
 1. Read [project status](docs/project-status.md).
 2. Read [requirements](docs/requirements.md) and the [implementation plan](docs/implementation-plan.md).
-3. Continue [Phase 01](docs/phases/phase-01-foundation-config-logging.md) one agreed step at a time. Step 5 (minimal API and health endpoint) is next.
+3. Continue [Phase 01](docs/phases/phase-01-foundation-config-logging.md) one agreed step at a time. Step 6 (structured logging) is next.
 4. Have the agent read [AGENTS.md](AGENTS.md) before implementing that phase.
 
 Suggested phase-chat prompt:

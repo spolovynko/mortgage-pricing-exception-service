@@ -59,3 +59,10 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Contribution: authored immutable Pydantic settings, `.env.example`, configuration tests, and related README/ADR/architecture/status/checklist/build-log updates. Used PowerShell, Git, uv, Python, pytest, Ruff, and the existing local project documentation. No subagents, API/model calls, or external sources were used.
 - Actual verification: `uv run --locked python -m pytest` -> 12 passed; Ruff lint/format, lock consistency, installed dependency checks, and `git diff --check` passed. See [build log](build-log.md) for exact commands, environment, and the initial assertion correction.
 - Review/limits: assistant inspected tool output. Human review and acceptance are not recorded. The tests validate settings construction only, not app startup, health/errors, logging, database/model operations, or platform compatibility. No duration is recorded. Phase remains incomplete; no commit/push was made.
+
+## 2026-10-29 - Phase 01, Step 5: minimal API and health endpoint
+
+- Task/scope: implement the app factory and process health endpoint only. Assistant inspected clean Git state and scoped references before editing.
+- Contribution: authored the FastAPI factory/health response, tests, selected the Starlette-supported test-client dependency after an observed deprecation failure, and updated setup/phase/architecture/ADR/status records. Used local PowerShell, Git, uv, Uvicorn, pytest, Ruff, and project docs. No subagents or external model/API calls.
+- Actual verification: 14 pytest cases passed, Ruff lint/format, lock/dependency checks and diff check passed. A live Uvicorn `/health` request returned `{"status":"ok"}`. Exact commands and versions are in [build log](build-log.md).
+- Review/limits: assistant inspected outputs; human review/acceptance is not recorded. Endpoint proves process liveness only. No structured logging, errors, database/model readiness, cross-platform behavior, or work duration is claimed. Phase incomplete; no commit/push.

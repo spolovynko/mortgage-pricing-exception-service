@@ -2,9 +2,9 @@
 
 - Date: 2026-10-29 (Europe/Brussels).
 - Phase / milestone: 01 / MVP1.
-- Status: Implemented for Steps 2-4 project setup, development checks, and configuration only.
-- Implementation state: partial phase; configuration is verified, API/logging/error handling decisions and implementation remain pending.
-- Decision owner or contributor: Codex assistant within the user's separate Step 2, Step 3, and Step 4 requests.
+- Status: Implemented for Steps 2-5 project setup, development checks, configuration, and minimal API only.
+- Implementation state: partial phase; process liveness is implemented and verified, structured logging/error handling remain pending.
+- Decision owner or contributor: Codex assistant within the user's separate Step 2, Step 3, Step 4, and Step 5 requests.
 - Human acceptance: not recorded for the resulting implementation.
 - Related requirements and phase guide: NFR-01, NFR-03, DEL-01/02/03; [Phase 01](../phases/phase-01-foundation-config-logging.md).
 
@@ -15,6 +15,8 @@ The repository was a clean documentation scaffold on `main` at `4e756fe`. The us
 Step 3 was subsequently requested separately. Its initial working tree was clean, with Step 2 committed as `d135997`. The authorised addition is development-check tooling and verification; configuration/API implementation remains deferred.
 
 Step 4 was then requested with a clean worktree following the Step 3 commit `986bd18`. Configuration is the only authorized behavior in this increment; API, logging, error envelopes, and all later-phase work remain deferred.
+
+Step 5 was requested with a clean worktree after Step 4 had been committed as `2ceb97e`. It authorizes the minimal API factory and process health endpoint. Structured logging and error behavior remain deferred.
 
 ## Options considered
 
@@ -28,10 +30,11 @@ Step 4 was then requested with a clean worktree following the Step 3 commit `986
 
 - Use the Python 3.12 series: `.python-version` selects it and `requires-python = ">=3.12,<3.13"` bounds the supported series. Verification used the available CPython 3.12.12; this is not a claim that the patch is the newest release.
 - Use uv 0.11.6 with `pyproject.toml` and `uv.lock`. `uv sync --locked` creates `.venv` and an editable installation, rejecting stale lock metadata. Runtime resolutions/hashes are recorded in `uv.lock`; Hatchling 1.30.1 is the pinned build backend. Do not maintain a second dependency list.
-- Use a `src/mortgage_pricing` package, currently containing only `__init__.py`. The distribution name is `mortgage-pricing-exception-service`, version `0.1.0`; the import name uses underscores. No unused application layers are created.
+- Use a `src/mortgage_pricing` package. It now contains the initializer, central settings, and a minimal application factory; the distribution name is `mortgage-pricing-exception-service`, version `0.1.0`; the import name uses underscores. No unused application layers are created.
 - Runtime dependencies remain FastAPI, Uvicorn, and Pydantic Settings, plus their resolved transitive dependencies. Step 4 uses Pydantic Settings for one immutable `Settings` model with an on-demand loader instead of a cached global, so tests and future app setup can inject isolated values. Configuration precedence follows Pydantic Settings: explicit constructor values, process environment, dotenv, then defaults. `.env.example` contains safe values; the existing .gitignore excludes the real `.env` file.
 - Validate app environment, log level, demo identity mode, and `LLM_MODE` with literal choices; constrain model name and timeout, validate service URL shapes, and accept only SQLite/PostgreSQL database URL schemes without creating storage or connecting. Use `LLM_MODE=off` and demo identity `off` by default. `auto` is reserved for capability discovery and must not start assessment inference. AI endpoint/model settings are inert configuration only.
-- Step 3 adds pytest and Ruff in the `dev` dependency group with their resolved versions in the same lockfile. Preserve the existing .gitignore, which already excludes `.venv`, bytecode, and tool caches.
+- Add `create_app(settings=None)` as the single application construction boundary. It accepts explicit Settings for isolated tests and loads validated settings when none are supplied. Do not create a module-global app; Uvicorn runs the factory via `--factory`, avoiding import-time configuration and shared test state. Implement `/health` as a stable `{"status":"ok"}` process-liveness response only. It must not be reported as database/model readiness.
+- Steps 3 and 5 add pytest, Ruff, and Starlette's supported `httpx2` test client in the `dev` dependency group with resolved versions in the same lockfile. Preserve the existing .gitignore, which already excludes `.venv`, bytecode, and tool caches.
 - Configure pytest discovery under `tests/`, `importlib` import mode, strict configuration/markers, and warnings as errors. Do not add a `pythonpath` workaround. A packaging integration test runs an isolated interpreter from a temporary directory, checking that imports and distribution metadata work independently of the repository working directory. No placeholder API or synthetic business test is needed at this step.
 - Configure Ruff in `pyproject.toml` for Python 3.12, a 100-character line length, and `E`, `F`, `I`, `UP`, `B`, `SIM` lint groups. Use the same tool for formatting. Run tools through `uv run --locked python -m ...` so project versions are selected consistently; do not add CI or pre-commit automation in this step.
 
@@ -39,7 +42,7 @@ Configuration precedence and accepted modes are implemented as above. Tracing, e
 
 ## Consequences
 
-The package imports through an isolated virtual environment and normal setup reuses the recorded dependency resolution. Editable installation makes source changes visible during development. The Python-series constraint prevents an accidental switch to the machine's default Python 3.14 launcher. This limits supported interpreters until a deliberate compatibility change is made. The repository has no API or executable workflow yet.
+The package imports through an isolated virtual environment and normal setup reuses the recorded dependency resolution. Editable installation makes source changes visible during development. The Python-series constraint prevents an accidental switch to the machine's default Python 3.14 launcher. This limits supported interpreters until a deliberate compatibility change is made. The API currently supports only process liveness; it has no business endpoints, readiness probes, or structured logging yet.
 
 ## Verification and evidence
 
@@ -65,6 +68,13 @@ The package imports through an isolated virtual environment and normal setup reu
 - `uv run --locked python -m pytest`: **12 passed**, including 11 configuration cases and the prior packaging test. Configuration checks cover default modes, environment and dotenv precedence, invalid modes/bounds/database scheme, safe error display, and immutability.
 - `uv run --locked python -m ruff check .`: passed. `uv run --locked python -m ruff format --check .`: passed. `uv lock --check`: passed with 24 packages. `uv pip check`: all installed packages compatible. `git diff --check`: passed; Git printed an informational LF-to-CRLF working-copy warning.
 - Limits: Windows/CPython 3.12.12 only. Settings construction was tested; no app factory/startup, health endpoint, logging, HTTP error handling, database connection, model discovery/inference, or other application behavior is implemented or verified. Phase 01 remains incomplete; acceptance checkboxes are not complete.
+
+### Step 5 evidence
+
+- Added `httpx2>=2,<3` in the locked dev group (resolved 2.16.0). The first TestClient run found Starlette 1.10 emits a deprecation warning when legacy `httpx` is used; since pytest treats warnings as errors, use the TestClient's supported `httpx2` dependency rather than suppressing that warning.
+- `uv run --locked python -m pytest`: **14 passed**, including factory state-isolation and health response tests. `uv run --locked python -m ruff check .`, `uv run --locked python -m ruff format --check .`, `uv lock --check` (28 packages), `uv pip check`, and `git diff --check` passed.
+- Live local verification: started Uvicorn using `uv run --locked uvicorn mortgage_pricing.main:create_app --factory --host 127.0.0.1 --port 8765 --log-level warning`; `Invoke-RestMethod -Uri 'http://127.0.0.1:8765/health' -Method Get` returned `{"status":"ok"}`. The local server was stopped after the request.
+- Limits: Windows/CPython 3.12.12 only. Health indicates process liveness only. No database/model readiness, business endpoint, structured logging, error handling, or other-platform behavior is claimed. Phase 01 remains incomplete.
 
 ## Alternatives rejected and revisit conditions
 
