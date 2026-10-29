@@ -43,6 +43,22 @@ def test_explicit_values_override_dotenv_and_defaults(tmp_path: Path) -> None:
     assert settings.log_level == "DEBUG"
 
 
+def test_configuration_precedence(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("APP_ENV=test\nLOG_LEVEL=DEBUG\n", encoding="utf-8")
+    monkeypatch.setenv("APP_ENV", "production")
+
+    assert Settings().app_env == "production"
+    assert Settings().log_level == "DEBUG"
+    assert Settings(app_env="development").app_env == "development"
+
+
+def test_example_file_contains_valid_defaults() -> None:
+    example = Path(__file__).resolve().parents[1] / ".env.example"
+
+    assert Settings(_env_file=example) == Settings(_env_file=None)
+
+
 @pytest.mark.parametrize(
     ("name", "value"),
     [
@@ -53,6 +69,12 @@ def test_explicit_values_override_dotenv_and_defaults(tmp_path: Path) -> None:
         ("LLM_TIMEOUT_SECONDS", "0"),
         ("LLM_TIMEOUT_SECONDS", "121"),
         ("DATABASE_URL", "mysql://localhost/db"),
+        ("UI_API_URL", "file:///private-path"),
+        ("LLM_BASE_URL", "not-a-url"),
+        ("LLM_TIMEOUT_SECONDS", "nan"),
+        ("LLM_TIMEOUT_SECONDS", "inf"),
+        ("LLM_MODEL", ""),
+        ("LLM_MODEL", "x" * 129),
     ],
 )
 def test_invalid_environment_settings_fail_without_echoing_values(

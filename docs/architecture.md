@@ -2,7 +2,7 @@
 
 Status: Packaging, configuration, health API, structured logging, request correlation, and safe HTTP errors implemented; broader application architecture remains a design baseline. Update this document as phases complete. Use ADRs for the rationale behind decisions.
 
-Phase 01 progress (2026-10-29): packaging, Python 3.12/uv setup, configuration, `/health`, request tracing, and safe error responses are implemented. Business components and dependency readiness probes remain planned; phase completion verification/handoff remains pending. See [ADR 0001](adr/0001-foundation-config-logging.md).
+Phase 01 completed (2026-10-29): packaging, Python 3.12/uv setup, configuration, `/health`, request tracing, and safe error responses are implemented and verified with a fresh environment and 48 passing tests. Business components and dependency readiness probes remain planned. See [ADR 0001](adr/0001-foundation-config-logging.md) and the [handoff](handoffs/phase-01.md). The optional UI stub was omitted; `ui/app.py` remains a Phase 04 entry-point location.
 
 ## Components and boundaries
 

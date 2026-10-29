@@ -2,9 +2,9 @@
 
 - Date: 2026-10-29 (Europe/Brussels).
 - Phase / milestone: 01 / MVP1.
-- Status: Implemented for Steps 2-7, including logging, correlation, and safe HTTP errors.
-- Implementation state: foundation behavior implemented; final phase verification and handoff remain pending.
-- Decision owner or contributor: Codex assistant within the user's separate incremental Step 2-7 requests.
+- Status: Implemented; Phase 01 complete after Step 8 verification.
+- Implementation state: foundation behavior, final checks, and [handoff](../handoffs/phase-01.md) complete on the tested Windows platform.
+- Decision owner or contributor: Codex assistant within the user's separate incremental Step 2-8 requests.
 - Human acceptance: not recorded for the resulting implementation.
 - Related requirements and phase guide: NFR-01, NFR-03, DEL-01/02/03; [Phase 01](../phases/phase-01-foundation-config-logging.md).
 
@@ -21,6 +21,8 @@ Step 5 was requested with a clean worktree after Step 4 had been committed as `2
 Step 6 was requested after Step 5 commit `5b8ed82`, with a clean working tree. Logging and request tracing are authorized; consistent HTTP error responses remain Step 7 work.
 
 Step 7 was requested after Step 6 commit `2f691b5`, with a clean working tree. Its scope is a consistent HTTP error contract and safe unexpected-failure handling. The optional middleware directory refactor was discussed but has not been applied in this increment.
+
+Step 8 was requested after Step 7 commit `e9358eb`, with a clean working tree. Scope is final verification, remediation of observed foundation gaps, and completion records; no later-phase implementation is authorized.
 
 ## Options considered
 
@@ -53,6 +55,10 @@ Use `config/logging.json` only at the Uvicorn command boundary to apply the same
 Centralize response models and builders in `errors.py`. HTTP/validation handlers reuse `{error: {code, message}, correlation_id}` and preserve status and supplied HTTP headers. HTTP errors use lower-case HTTPStatus names and standard phrases; unknown nonstandard statuses use `http_error`. Validation failures use `validation_error` and a generic message, deliberately excluding input values, custom messages, and field names that can contain request data. HTTP 5xx errors use `internal_error` and a generic message. Later domain-specific contracts belong to Phase 03.
 
 Handle unexpected exceptions inside the existing tracing boundary, where the correlation context and timing are available. Log once using safe diagnostics, send generic HTTP 500, and reset the context. This avoids relying on the outer server error middleware, which otherwise rethrows after sending and can duplicate logs. Do not catch cancellation/system-exit exceptions. If headers are already sent (stream/background failure), log and rethrow without sending a second response. Tests cover that limitation explicitly. Runtime demo identity behavior and UI implementation remain later-phase work. No business policy changed.
+
+Step 8 closes a test-isolation gap: `_env_file=None` does not disable process-environment settings. Use an autouse fixture to clear known settings variables and switch to a temporary working directory before each test. This allows intentional env/dotenv tests while keeping developer files untouched. Added precedence/example-file and URL/model/timeout boundary checks, verified again with deliberately invalid external shell/dotenv settings.
+
+Omit the optional nonfunctional UI stub: foundation behavior is exercised through `/health` and tests, while a UI placeholder adds no useful behavior. Retain `ui/app.py` as the documented future Phase 04 location without adding Streamlit early. Existing modules already separate configuration, log formatting, HTTP tracing, and error contracts; the suggested middleware directory move is cosmetic and remains unapplied.
 
 ## Consequences
 
@@ -102,6 +108,13 @@ The package imports through an isolated virtual environment and normal setup reu
 - Full pytest: **40 passed**, including 12 error cases covering 404/405, HTTP exception details/headers, invalid/malformed JSON, safe unexpected failures, correlation/recovery, failures after response start, and invalid settings at app creation. Ruff lint/format, lock consistency (28 packages), and installed-dependency checks passed. A long test comment was corrected after the initial lint check; no warning rules were relaxed.
 - Live local Uvicorn ran the real app with a temporary stdin-only failure route. `/health` returned 200 with `step7-success`; the synthetic failure returned generic 500 with `step7-failure` in both body/header and its single diagnostic record. The synthetic exception message was absent. Server stopped; the failure route was not added to application source.
 - Limits: Windows/CPython 3.12.12 only; no business/database/model/container verification or human acceptance. Failures after response start cannot replace the response. Phase remains in progress pending fresh-environment verification and handoff.
+
+### Step 8 evidence and completion
+
+- Workspace suite: **48 passed**; Ruff lint/format, lock consistency (28 packages), and installed-dependency checks passed.
+- A temporary `UV_PROJECT_ENVIRONMENT` selected a newly created venv; `uv sync --locked` installed 27 packages. The complete 48-test suite, Ruff lint/format, and `uv pip check --python <temporary-venv>/Scripts/python.exe` passed there.
+- Fresh live Uvicorn using `.env.example` returned correlated 200/404 responses with matching JSON completion records and no synthetic query secret. A second test run from a temporary directory containing invalid `.env` settings, with invalid application shell settings, passed all 48 tests. Owned temporary server/environment artifacts were removed; the existing `.venv` and user files were preserved.
+- Phase 01 acceptance criteria and records are complete; optional UI omission is explicit. Runtime versions, exact commands, and final static checks are in [build log](../build-log.md) and [handoff](../handoffs/phase-01.md). Windows/CPython 3.12.12 only; no human acceptance, duration, production-readiness, business/database/container/model verification is claimed. Next is Phase 02, not started.
 
 ## Alternatives rejected and revisit conditions
 

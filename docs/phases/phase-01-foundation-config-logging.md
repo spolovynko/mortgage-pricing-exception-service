@@ -1,10 +1,10 @@
 # Phase 01 - Foundation, configuration, and logging
 
-- Status: In progress (Steps 2-7 verified; final phase verification and handoff pending).
+- Status: Complete (2026-10-29; Steps 1-8 and acceptance checks verified on Windows/CPython 3.12.12).
 - Milestone: MVP1.
 - Prerequisite: documentation scaffold; inspect actual repository state.
-- Primary ADR to create: `docs/adr/0001-foundation-config-logging.md`.
-- Handoff to create: `docs/handoffs/phase-01.md`.
+- Primary ADR: [ADR 0001](../adr/0001-foundation-config-logging.md), Implemented.
+- Handoff: [Phase 01](../handoffs/phase-01.md).
 
 ## Objective
 
@@ -29,7 +29,7 @@ Establish the installable `mortgage_pricing` package under src/, tests/, UI entr
 - [x] Add JSON logging with timestamp, severity, event, correlation_id, outcome, and duration; domain IDs are added when available.
 - [x] Bound/validate supplied correlation identifiers, return the operation identifier to callers, and avoid raw body/secret logging. Step 7 includes unexpected 500 responses before response start.
 - [x] Establish a consistent error envelope. Unexpected failures receive a safe response and useful server-side diagnostics.
-- [ ] Create a minimal UI entry point if helpful, labelled as a scaffold rather than a working request workflow.
+- [x] Assess the optional UI entry point: omitted because a nonfunctional stub adds no foundation behavior. The planned `ui/app.py` belongs to Phase 04; no UI is claimed as implemented. See ADR 0001.
 - [x] Establish formatting/lint and test commands; document dependency installation before showing runnable commands.
 
 ## Verification
@@ -62,18 +62,26 @@ Added `errors.py` for the common error/correlation envelope and HTTP/validation 
 
 Observed: full pytest **40 passed**; Ruff lint/format, lock consistency (28 packages), and dependency checks passed. Live Uvicorn with a temporary in-memory test route returned 200 and generic 500; response body/header/log IDs matched, the failure logged once, and the synthetic exception message was absent. The temporary server was stopped; no failure route was added to application source. Windows/CPython 3.12.12 only. Final fresh-environment verification and phase handoff remain pending.
 
+### Step 8 - final verification and handoff (2026-10-29)
+
+Added an autouse fixture clearing application environment variables and using temporary working directories, closing an observed test-isolation gap. Added full configuration-precedence and `.env.example` checks plus URL/model/timeout boundary cases. Existing environment and `.env` files are untouched. No dependency changes.
+
+Fresh verification used `UV_PROJECT_ENVIRONMENT` pointing to a newly created temporary venv: `uv sync --locked` installed 27 packages; full pytest **48 passed**; Ruff lint/format and dependency compatibility passed. A live API from that environment, using `.env.example`, returned correlated 200 and 404 responses with matching JSON logs and no synthetic query secret. All 48 tests also passed from a temporary directory containing deliberately invalid `.env` values and with invalid shell settings. Owned server/environment artifacts were removed. Lock consistency passed in the workspace. Exact commands, limitations, and final static verification are in the build log and handoff.
+
+All acceptance criteria are satisfied within Phase 01 scope. The optional UI stub is intentionally omitted, and the middleware directory refactor remains an unimplemented suggestion. No business/database/container/model capability or human review is claimed. Next: Phase 02 in a separate implementation chat.
+
 Test settings defaults, environment overrides, invalid values, isolated test settings, health responses, correlation propagation, and safe error/log behaviour. Tests must not require a real database, Docker, an external network, or a model.
 
 Use the actual supported commands. Expected forms after installation include `python -m pytest` and `python -m ruff check .`; configure them before claiming they work. Manually start the minimal API and inspect one success and one failure log.
 
 ## Acceptance criteria
 
-- [ ] A documented fresh local environment can install and run the minimal API.
+- [x] A documented fresh local environment can install and run the minimal API. Step 8 temporary venv, 48 tests, and live 200/404 checks passed.
 - [x] Invalid configuration fails clearly before normal operation. Tested at application creation in Step 7.
 - [x] Repeated application/test creation does not accumulate handlers or share mutable request state. Step 6 handler/context isolation tests pass.
 - [x] Health and error responses are consistent and traceable in logs. Steps 6-7 automated and live verification passed.
-- [x] Relevant tests and lint checks pass with observed evidence. Step 7: 40 passed; Ruff lint/format passed.
-- [ ] No business/AI/container capability is falsely claimed as implemented.
+- [x] Relevant tests and lint checks pass with observed evidence. Step 8: 48 passed in workspace, fresh environment, and external-settings isolation scenario; Ruff lint/format passed.
+- [x] No business/AI/container capability is falsely claimed as implemented. Scope inspected and limitations recorded in README, ADR, status, and handoff.
 
 ## Decision record and handover
 

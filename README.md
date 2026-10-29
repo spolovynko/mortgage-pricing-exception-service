@@ -4,7 +4,7 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 ## Current state
 
-Phase 01 is in progress. Steps 2-7 supply the Python package and development tools, validated configuration, a minimal health API, structured request logging, and safe correlated error responses. Final phase verification and handoff remain pending; business endpoints, UI, containers, and model integration belong to later phases.
+Phase 01 is complete: installable Python package, locked development tools, validated configuration, health API, structured request logging, and safe correlated error responses. Fresh-install verification passed on Windows/CPython 3.12.12 with **48 tests passing**. See the [Phase 01 handoff](docs/handoffs/phase-01.md). Business endpoints, database implementation, UI, containers, and model integration belong to later phases.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -47,7 +47,7 @@ uv run --locked python -m ruff format --check .
 
 These commands use the locked project tools, rather than whichever pytest or Ruff is installed globally. Tested versions: pytest 9.2.0 and Ruff 0.17.3 on Windows/CPython 3.12.12. To apply formatting, use `uv run --locked python -m ruff format .`.
 
-pytest discovers `tests/`, uses `importlib` import mode without adding a source path, rejects unknown configuration/markers, and treats warnings as errors. Tests cover isolated package installation/import, validated configuration, and the API factory/health endpoint. They need no database, Docker, or model. The live Uvicorn check is documented below and was verified separately.
+pytest discovers `tests/`, uses `importlib` import mode without adding a source path, rejects unknown configuration/markers, and treats warnings as errors. Tests cover package installation/import, configuration, health, errors, logging, and concurrent correlation isolation. An autouse fixture removes application settings from the test environment and uses temporary working directories, keeping real `.env` files out of tests. The 48 tests also passed with deliberately invalid external settings and dotenv content. No database, Docker, or model is needed.
 
 Ruff targets Python 3.12 with a 100-character line length. Enabled rule groups check common style errors (`E`), undefined/unused names and imports (`F`), import ordering (`I`), Python modernization (`UP`), likely bug patterns (`B`), and simplifications (`SIM`). The existing .gitignore covers pytest/Ruff caches and Python bytecode.
 
@@ -97,14 +97,14 @@ The same ID appears in `X-Correlation-ID` and the failure log. The request bound
 
 1. Read [project status](docs/project-status.md).
 2. Read [requirements](docs/requirements.md) and the [implementation plan](docs/implementation-plan.md).
-3. Continue [Phase 01](docs/phases/phase-01-foundation-config-logging.md) with final verification and completion records when requested.
+3. Read the [Phase 01 handoff](docs/handoffs/phase-01.md), then start [Phase 02: database and seed data](docs/phases/phase-02-database-and-seed-data.md) in the next implementation chat.
 4. Have the agent read [AGENTS.md](AGENTS.md) before implementing that phase.
 
 Suggested phase-chat prompt:
 
 ```text
-Implement Phase 01 in this repository. Read AGENTS.md, docs/project-status.md,
-the phase guide, and its required references first. Complete the phase's
+Implement Phase 02 in this repository. Read AGENTS.md, docs/project-status.md,
+docs/handoffs/phase-01.md, the phase guide, and its required references first. Complete the phase's
 verification, write its ADR and handoff, and update the build log, AI usage
 record, and project status. Stop after this phase and report any unmet criteria.
 ```
@@ -131,7 +131,7 @@ Python, FastAPI/Uvicorn, Pydantic Settings, SQLAlchemy, SQLite, Alembic, Streaml
 
 ## Target startup experience
 
-These commands are **future acceptance targets**, not commands supported by this documentation-only scaffold:
+These commands are **future acceptance targets** for container implementation:
 
 ```bash
 # Core UI and API
