@@ -14,6 +14,7 @@ def test_defaults_are_valid_and_safe() -> None:
     assert settings.demo_identity_mode == "off"
     assert settings.llm_mode == "off"
     assert settings.llm_timeout_seconds == 30
+    assert settings.sqlite_busy_timeout_seconds == 5
     assert "127.0.0.1" in str(settings.ui_api_url)
     assert "127.0.0.1" in str(settings.llm_base_url)
     assert "password" not in repr(settings)
@@ -24,6 +25,7 @@ def test_environment_overrides_defaults(monkeypatch: pytest.MonkeyPatch) -> None
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     monkeypatch.setenv("LLM_MODE", "auto")
     monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "45")
+    monkeypatch.setenv("SQLITE_BUSY_TIMEOUT_SECONDS", "0.25")
 
     settings = get_settings()
 
@@ -31,6 +33,7 @@ def test_environment_overrides_defaults(monkeypatch: pytest.MonkeyPatch) -> None
     assert settings.log_level == "DEBUG"
     assert settings.llm_mode == "auto"
     assert settings.llm_timeout_seconds == 45
+    assert settings.sqlite_busy_timeout_seconds == 0.25
 
 
 def test_explicit_values_override_dotenv_and_defaults(tmp_path: Path) -> None:
@@ -68,6 +71,9 @@ def test_example_file_contains_valid_defaults() -> None:
         ("LLM_MODE", "on"),
         ("LLM_TIMEOUT_SECONDS", "0"),
         ("LLM_TIMEOUT_SECONDS", "121"),
+        ("SQLITE_BUSY_TIMEOUT_SECONDS", "0"),
+        ("SQLITE_BUSY_TIMEOUT_SECONDS", "30.1"),
+        ("SQLITE_BUSY_TIMEOUT_SECONDS", "nan"),
         ("DATABASE_URL", "mysql://localhost/db"),
         ("UI_API_URL", "file:///private-path"),
         ("LLM_BASE_URL", "not-a-url"),

@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: Phase 01 complete. Phase 02 is in progress; its baseline Step 1 is complete and persistence implementation has not started.
+Status: Phase 01 complete. Phase 02 Steps 1-2 are complete; the persistence foundation is partial and SQLite integrity configuration is next. See [project status](project-status.md).
 
 This plan implements the requirements and the user's agreed additions: a Python UI, optional local AI, automatic model setup, operational logging, central configuration, and one application Dockerfile with one Compose file.
 

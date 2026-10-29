@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     app_env: Literal["development", "test", "production"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     database_url: str = Field(default="sqlite:///./data/mortgage_pricing.db", repr=False)
+    sqlite_busy_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
     demo_identity_mode: Literal["off", "header"] = "off"
     ui_api_url: HttpUrl = HttpUrl("http://127.0.0.1:8000/")
     llm_mode: Literal["off", "auto"] = "off"

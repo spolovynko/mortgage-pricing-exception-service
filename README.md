@@ -4,7 +4,9 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 ## Current state
 
-Phase 01 is complete: installable Python package, locked development tools, validated configuration, health API, structured request logging, and safe correlated error responses. Fresh-install verification passed on Windows/CPython 3.12.12 with **48 tests passing**. See the [Phase 01 handoff](docs/handoffs/phase-01.md). Business endpoints, database implementation, UI, containers, and model integration belong to later phases.
+Phase 01 is complete: installable Python package, locked development tools, validated configuration, health API, structured request logging, and safe correlated error responses. Its fresh-install verification passed on Windows/CPython 3.12.12 with **48 tests passing**. See the [Phase 01 handoff](docs/handoffs/phase-01.md).
+
+Phase 02 Steps 1-2 are complete. SQLAlchemy/Alembic dependencies, shared metadata, and explicit resource factories are available; **62 tests pass** in the workspace. SQLite integrity configuration, business models, migrations, seeds, and readiness remain pending. The API still provides process liveness only. See the [Phase 02 guide](docs/phases/phase-02-database-and-seed-data.md) and [ADR 0002](docs/adr/0002-database-and-seed-data.md). Business endpoints, UI, containers, and model integration remain later-phase work.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -30,7 +32,7 @@ uv pip check
 uv run --locked python -I -c "import mortgage_pricing, fastapi, pydantic_settings, uvicorn; print(mortgage_pricing.__file__)"
 ```
 
-No activation is required. Python's `-I` mode excludes the current directory and `PYTHONPATH`, so the import checks the installed package. The package contains its initializer, central settings model, and FastAPI app factory. Runtime dependencies are FastAPI, Uvicorn, and Pydantic Settings. pytest, Ruff, and the Starlette-compatible `httpx2` test client are development dependencies in the `dev` group, installed by the setup command above.
+No activation is required. Python's `-I` mode excludes the current directory and `PYTHONPATH`, so the import checks the installed package. The package contains central settings, the FastAPI app factory, and persistence metadata/factories. Runtime dependencies are FastAPI, Uvicorn, Pydantic Settings, SQLAlchemy, and Alembic. pytest, Ruff, and the Starlette-compatible `httpx2` test client are development dependencies in the `dev` group, installed by the setup command above.
 
 For deliberate dependency changes, use `uv add <package>` and review both dependency files. Normal setup uses `--locked` so stale metadata fails rather than silently updating the lock. See [ADR 0001](docs/adr/0001-foundation-config-logging.md) for rationale and verification limits.
 
@@ -47,7 +49,7 @@ uv run --locked python -m ruff format --check .
 
 These commands use the locked project tools, rather than whichever pytest or Ruff is installed globally. Tested versions: pytest 9.2.0 and Ruff 0.17.3 on Windows/CPython 3.12.12. To apply formatting, use `uv run --locked python -m ruff format .`.
 
-pytest discovers `tests/`, uses `importlib` import mode without adding a source path, rejects unknown configuration/markers, and treats warnings as errors. Tests cover package installation/import, configuration, health, errors, logging, and concurrent correlation isolation. An autouse fixture removes application settings from the test environment and uses temporary working directories, keeping real `.env` files out of tests. The 48 tests also passed with deliberately invalid external settings and dotenv content. No database, Docker, or model is needed.
+pytest discovers `tests/`, uses `importlib` import mode without adding a source path, rejects unknown configuration/markers, and treats warnings as errors. Tests cover packaging, configuration, health, errors, logging, correlation isolation, and persistence resource lifetimes. An autouse fixture clears application settings and uses temporary working directories, keeping real `.env` files out of tests. The historical Phase 01 48-test suite also passed with deliberately invalid external settings and dotenv content. The current 62-test suite creates only temporary SQLite probe files; no existing database, database server, Docker, or model is needed.
 
 Ruff targets Python 3.12 with a 100-character line length. Enabled rule groups check common style errors (`E`), undefined/unused names and imports (`F`), import ordering (`I`), Python modernization (`UP`), likely bug patterns (`B`), and simplifications (`SIM`). The existing .gitignore covers pytest/Ruff caches and Python bytecode.
 
@@ -55,7 +57,7 @@ Ruff targets Python 3.12 with a 100-character line length. Enabled rule groups c
 
 `mortgage_pricing.config.Settings` is the central, immutable settings model. Defaults are safe for local development: demo identity is off and `LLM_MODE` is off. Copy `.env.example` to `.env` to override values locally; `.env` is gitignored. Precedence is explicit constructor values, process environment, `.env`, then code defaults. Tests pass isolated settings or disable `.env` loading so they do not depend on a developer's machine.
 
-Accepted modes and bounds are validated while constructing `Settings`. Supported environment values are development/test/production; log levels DEBUG/INFO/WARNING/ERROR/CRITICAL; demo identity off/header; and LLM mode off/auto. `auto` reserves capability discovery only; it does not run assessment inference. The database URL currently accepts SQLite and PostgreSQL schemes, without connecting to or creating a database. AI settings are configuration only; no model integration is implemented. When service containers are added, their addresses will need container-specific overrides.
+Accepted modes and bounds are validated while constructing `Settings`. Supported environment values are development/test/production; log levels DEBUG/INFO/WARNING/ERROR/CRITICAL; demo identity off/header; and LLM mode off/auto. `auto` reserves capability discovery only; it does not run assessment inference. Settings accept SQLite and reserved PostgreSQL URL schemes without connecting. The persistence factory currently supports SQLite only. `SQLITE_BUSY_TIMEOUT_SECONDS` defaults to 5 seconds, greater than 0 and at most 30. AI settings are configuration only; no model integration is implemented. When service containers are added, their addresses will need container-specific overrides.
 
 The API uses a factory, so Uvicorn can construct an app and load validated settings at startup:
 
@@ -93,20 +95,28 @@ Unexpected exceptions before response start receive HTTP 500:
 
 The same ID appears in `X-Correlation-ID` and the failure log. The request boundary logs the diagnostic once and sends the safe response. HTTP exceptions with 5xx status also receive a generic internal-error message. Already-started streams/background failures cannot replace a response; they are logged and rethrown. Run `uv run --locked python -m pytest tests/test_errors.py` to verify the error contract.
 
+## Persistence foundation (Phase 02, Step 2)
+
+`persistence/base.py` defines shared metadata with stable constraint names. `persistence/database.py` provides `create_database_engine(settings)` and `create_session_factory(engine)` without import-time or construction-time I/O. The caller closes sessions/connections and then disposes the engine. Use `with factory.begin() as session` for basic commit/rollback/closure; a plain session context never commits implicitly. Each operation owns its session. SQL echo is off and bound parameter values are hidden in exception text.
+
+This foundation is incomplete: foreign-key enforcement and explicit SQLite driver transaction mode are Step 3 work. Business writes must wait for those guarantees. The API does not yet create database resources; its storage lifecycle/readiness wiring is Step 11. No operational schema or seed command exists yet. Alembic is installed; its configuration and migration arrive in Step 9.
+
+Run `uv run --locked python -m pytest tests/persistence` to verify the 11 foundation cases. These tests use a probe table in temporary files. No application code creates tables or directories. See [ADR 0002](docs/adr/0002-database-and-seed-data.md) for the resource contract and limitations.
+
 ## Continue implementation
 
 1. Read [project status](docs/project-status.md).
 2. Read [requirements](docs/requirements.md) and the [implementation plan](docs/implementation-plan.md).
-3. Read the [Phase 01 handoff](docs/handoffs/phase-01.md), then start [Phase 02: database and seed data](docs/phases/phase-02-database-and-seed-data.md) in the next implementation chat.
+3. Read the [Phase 01 handoff](docs/handoffs/phase-01.md), [Phase 02 guide](docs/phases/phase-02-database-and-seed-data.md), and [ADR 0002](docs/adr/0002-database-and-seed-data.md). Step 3 is next, only when requested.
 4. Have the agent read [AGENTS.md](AGENTS.md) before implementing that phase.
 
 Suggested phase-chat prompt:
 
 ```text
-Implement Phase 02 in this repository. Read AGENTS.md, docs/project-status.md,
-docs/handoffs/phase-01.md, the phase guide, and its required references first. Complete the phase's
-verification, write its ADR and handoff, and update the build log, AI usage
-record, and project status. Stop after this phase and report any unmet criteria.
+Implement Phase 02 execution Step 3 only. Read AGENTS.md, docs/project-status.md,
+the phase guide, ADR 0002, and their required references. Inspect Git/source state
+and preserve existing changes. Complete Step 3 checks and evidence records,
+then stop before Step 4. Do not commit or push.
 ```
 
 Change the phase number and guide for each subsequent chat. Use the same repository so the agent has access to its documentation and implementation.

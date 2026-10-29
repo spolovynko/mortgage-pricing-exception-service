@@ -4,13 +4,14 @@ Last updated: 2026-10-29
 
 ## Current position
 
-- Repository state: Phase 01 complete. Phase 02 is in progress with baseline Step 1 complete and no persistence implementation yet.
+- Repository state: Phase 01 complete. Phase 02 is in progress with Steps 1-2 complete and an incomplete persistence foundation.
 - Scaffold placement: documents are present in the active Git working folder; the existing repository title and .gitignore were preserved. No implementation commit was created by the placement task.
 - Completed implementation phase: [Phase 01 - Foundation, configuration, logging](phases/phase-01-foundation-config-logging.md), implemented in user-requested Steps 1-8. See [handoff](handoffs/phase-01.md).
-- Next action: [Phase 02 Step 2 - persistence foundation](phases/phase-02-database-and-seed-data.md), only after the user's instruction. Do not continue automatically.
+- Next action: [Phase 02 Step 3 - SQLite transaction configuration](phases/phase-02-database-and-seed-data.md), only after the user's instruction. Do not continue automatically.
 - Project setup: Python 3.12 series, uv 0.11.6, `pyproject.toml` + `uv.lock`, `src/mortgage_pricing/__init__.py`, and ignored `.venv`. Fresh installation, isolated imports, lock consistency, and dependency consistency passed on Windows/CPython 3.12.12.
-- Development checks: 48 tests pass in the workspace, a fresh temporary environment, and an invalid external-settings scenario. Ruff lint/format and lock/dependency checks pass. pytest 9.2.0/Ruff 0.17.3; Windows/CPython 3.12.12 only. Tests clear app environment variables and isolate their working directories.
+- Development checks: Step 2 workspace suite passes 62 tests, including 11 persistence-foundation cases. Ruff lint/format and lock/dependency checks pass (33 locked/32 installed packages). Phase 01's historical fresh-environment and invalid external-settings runs covered its 48-test suite; those scenarios have not been rerun for Phase 02. Windows/CPython 3.12.12 only; tests isolate shell/dotenv settings and working directories.
 - Configuration: immutable Pydantic Settings and `.env.example` with validated modes, URLs, bounds, and documented precedence; configuration tests pass. It does not connect to a database or model.
+- Persistence foundation: SQLAlchemy 2.0.55, Alembic 1.20.1, shared empty metadata, and lazy engine/session factories. `SQLITE_BUSY_TIMEOUT_SECONDS` defaults to 5 (greater than 0 and at most 30). Tests verify basic DML commit/rollback, resource release, and file isolation. Step 3 foreign keys/driver transaction configuration is pending; do not use the foundation for business writes yet. See [ADR 0002](adr/0002-database-and-seed-data.md).
 - API: `create_app` factory and `GET /health` are implemented; tests and a local Uvicorn request pass. The health response is process liveness only.
 - Logging/errors: per-app JSON logger, ASGI tracing, safe diagnostics, and centralized error envelope/handlers. Live 200/404 checks passed from the fresh environment; Step 7 live 500 verification also passed. Unexpected exceptions before response start return a generic correlated 500. Failures after response start are logged/rethrown.
 - Business endpoints, UI, Docker, and model implementation: not present. Live-model evaluation is not available.
@@ -23,7 +24,7 @@ Documentation scaffold verification on 2026-10-28: 21 Markdown files and 105 rel
 | Phase | Status | ADR | Handoff |
 | --- | --- | --- | --- |
 | 01 | Complete | [ADR 0001](adr/0001-foundation-config-logging.md), Implemented | [Phase 01](handoffs/phase-01.md) |
-| 02 | In progress; baseline Step 1 complete | Due during implementation | Due at phase completion |
+| 02 | In progress; Steps 1-2 complete | [ADR 0002](adr/0002-database-and-seed-data.md), Implemented for Step 2 | Due at phase completion |
 | 03 | Not started | To be written | To be written |
 | 04 | Not started | To be written | To be written |
 | 05 | Not started | To be written | To be written |
@@ -60,4 +61,4 @@ The proposed business policy is in [requirements.md](requirements.md). Record an
 
 ## Next chat
 
-Continue Phase 02 at execution Step 2 only when requested. Step 1 verified the clean `0bc29a0` baseline with 48 passing tests and all existing checks passing. The older Phase 01 handoff records its historical pre-commit state; `0bc29a0` contains all completed Phase 01 work. No persistence code, dependency, migration, seed data, readiness behavior, commit, or push was added in Step 1. Human review/acceptance and active work time are not recorded.
+Continue Phase 02 at execution Step 3 only when requested. Step 2 began from clean `main` at `54e219e`; its code/tests/dependency/records changes are uncommitted. Read ADR 0002 and the phase guide before extending it. SQLite integrity configuration, business models, migrations, seeds, API readiness wiring, whole-phase acceptance, and handoff remain pending. The older Phase 01 handoff records its historical pre-commit state; `0bc29a0` contains the completed Phase 01 work. Human review/acceptance and active work time are not recorded. No assistant commit or push.
