@@ -3,7 +3,7 @@
   "disable_existing_loggers": false,
   "formatters": {
     "json": {
-      "()": "mortgage_pricing.logging_config.JsonFormatter"
+      "()": "mortgage_pricing.observability.logging.JsonFormatter"
     }
   },
   "handlers": {

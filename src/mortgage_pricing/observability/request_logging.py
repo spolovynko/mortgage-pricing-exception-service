@@ -8,8 +8,8 @@ from uuid import uuid4
 from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from mortgage_pricing.errors import internal_error_response
-from mortgage_pricing.logging_config import correlation_id
+from mortgage_pricing.api.errors import internal_error_response
+from mortgage_pricing.observability.logging import correlation_id
 
 _CORRELATION_ID = re.compile(rb"[A-Za-z0-9][A-Za-z0-9._-]{0,63}")
 

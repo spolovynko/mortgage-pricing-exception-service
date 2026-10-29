@@ -13,17 +13,17 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
-from mortgage_pricing.api_foundation import DemoError, demo_error_handler
-from mortgage_pricing.api_foundation import router as demo_router
-from mortgage_pricing.api_pricing import router as pricing_router
-from mortgage_pricing.api_reads import router as reads_router
-from mortgage_pricing.api_requests import router as requests_router
-from mortgage_pricing.api_workflow import router as workflow_router
+from mortgage_pricing.api.errors import error_response, register_error_handlers
+from mortgage_pricing.api.foundation import DemoError, demo_error_handler
+from mortgage_pricing.api.foundation import router as demo_router
+from mortgage_pricing.api.pricing import router as pricing_router
+from mortgage_pricing.api.reads import router as reads_router
+from mortgage_pricing.api.requests import router as requests_router
+from mortgage_pricing.api.workflow import router as workflow_router
 from mortgage_pricing.config import Settings, get_settings
-from mortgage_pricing.errors import error_response, register_error_handlers
-from mortgage_pricing.logging_config import create_logger
+from mortgage_pricing.observability.logging import create_logger
+from mortgage_pricing.observability.request_logging import RequestLoggingMiddleware
 from mortgage_pricing.persistence.database import create_database_engine
-from mortgage_pricing.request_logging import RequestLoggingMiddleware
 
 
 class HealthResponse(BaseModel):

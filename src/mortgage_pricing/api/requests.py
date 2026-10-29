@@ -7,11 +7,11 @@ from fastapi import APIRouter, Header, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.responses import JSONResponse
 
-from mortgage_pricing.api_foundation import ActorId
-from mortgage_pricing.errors import ErrorResponse, error_response
+from mortgage_pricing.api.errors import ErrorResponse, error_response
+from mortgage_pricing.api.foundation import ActorId
+from mortgage_pricing.domain.request_context import RequestContext
 from mortgage_pricing.persistence.database import create_session_factory
 from mortgage_pricing.persistence.operations import MAX_DISCOUNT_BPS, OperationError, create_request
-from mortgage_pricing.request_context import RequestContext
 
 router = APIRouter(tags=["requests"])
 

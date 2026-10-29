@@ -8,7 +8,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from mortgage_pricing.config import Settings, get_settings
-from mortgage_pricing.logging_config import create_logger
+from mortgage_pricing.observability.logging import create_logger
 from mortgage_pricing.persistence.database import create_database_engine, create_session_factory
 from mortgage_pricing.persistence.models import (
     MortgageApplication,

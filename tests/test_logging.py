@@ -9,9 +9,9 @@ from fastapi.testclient import TestClient
 from starlette.types import Message, Receive, Scope, Send
 
 from mortgage_pricing.config import Settings
-from mortgage_pricing.logging_config import correlation_id, create_logger
 from mortgage_pricing.main import create_app
-from mortgage_pricing.request_logging import RequestLoggingMiddleware
+from mortgage_pricing.observability.logging import correlation_id, create_logger
+from mortgage_pricing.observability.request_logging import RequestLoggingMiddleware
 
 
 def test_request_log_schema_and_correlation_propagation(capsys: pytest.CaptureFixture[str]) -> None:

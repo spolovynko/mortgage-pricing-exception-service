@@ -28,18 +28,28 @@ flowchart TD
 - **AI adapter:** bounded calls to Ollama, structured-response validation, and assessment metadata. No tools that change approval state.
 - **Model-init:** wait for the runtime, inspect the local cache, download only if missing, warm up, and report results. It is independent of core API readiness.
 
-## Planned source layout
+## Source layout
 
-This is a starting structure, not a requirement to create empty modules or interfaces:
+Implemented modules are grouped by responsibility; the `ai/` and model-init entries remain Phase 06 plans:
 
 ```text
 src/mortgage_pricing/
   main.py
   config.py
-  logging_config.py
+  container_startup.py
   seed.py
   api/
+    errors.py
+    foundation.py
+    pricing.py
+    reads.py
+    requests.py
+    workflow.py
   domain/
+    request_context.py
+  observability/
+    logging.py
+    request_logging.py
   persistence/
   ai/
 ui/

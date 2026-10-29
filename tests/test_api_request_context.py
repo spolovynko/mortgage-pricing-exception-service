@@ -8,8 +8,8 @@ from alembic.config import Config
 from fastapi.testclient import TestClient
 
 from mortgage_pricing.config import Settings
+from mortgage_pricing.domain.request_context import RequestContext
 from mortgage_pricing.main import create_app
-from mortgage_pricing.request_context import RequestContext
 from mortgage_pricing.seed import APPLICATIONS, seed_database
 
 ROOT = Path(__file__).resolve().parents[1]

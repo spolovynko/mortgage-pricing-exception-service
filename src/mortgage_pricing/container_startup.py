@@ -9,7 +9,7 @@ from alembic.config import Config
 from sqlalchemy.engine import make_url
 
 from mortgage_pricing.config import Settings, get_settings
-from mortgage_pricing.logging_config import create_logger
+from mortgage_pricing.observability.logging import create_logger
 from mortgage_pricing.seed import SeedResult, seed_database
 
 APPLICATION_ROOT = Path(

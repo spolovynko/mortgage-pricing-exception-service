@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.engine import make_url
 
-from mortgage_pricing.errors import ErrorResponse, error_response
+from mortgage_pricing.api.errors import ErrorResponse, error_response
 from mortgage_pricing.persistence.database import create_session_factory
 from mortgage_pricing.persistence.models import MortgageApplication, Role, User
 

@@ -10,7 +10,7 @@ from starlette.types import Message, Receive, Scope, Send
 
 from mortgage_pricing.config import Settings
 from mortgage_pricing.main import create_app
-from mortgage_pricing.request_logging import RequestLoggingMiddleware
+from mortgage_pricing.observability.request_logging import RequestLoggingMiddleware
 
 
 @pytest.mark.parametrize(
