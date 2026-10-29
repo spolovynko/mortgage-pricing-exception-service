@@ -41,7 +41,9 @@ class NoApprovedDiscount(BaseModel):
     summary="Retrieve usable pricing from the current approved version",
     responses={
         401: {"model": ErrorResponse, "description": "Demo identity required"},
+        403: {"model": ErrorResponse, "description": "No internal role"},
         404: {"model": ErrorResponse, "description": "Application not found"},
+        422: {"model": ErrorResponse, "description": "Invalid application identifier"},
         503: {"model": ErrorResponse, "description": "Storage or demo identity unavailable"},
     },
 )

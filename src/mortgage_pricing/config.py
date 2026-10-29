@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     sqlite_busy_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
     demo_identity_mode: Literal["off", "header"] = "off"
     ui_api_url: HttpUrl = HttpUrl("http://127.0.0.1:8000/")
+    ui_timeout_seconds: float = Field(default=10.0, gt=0, le=120)
     llm_mode: Literal["off", "auto"] = "off"
     llm_base_url: HttpUrl = HttpUrl("http://127.0.0.1:11434/")
     llm_model: str = Field(default="qwen3:4b-instruct-2507-q4_K_M", min_length=1, max_length=128)

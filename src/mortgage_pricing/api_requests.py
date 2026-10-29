@@ -10,7 +10,7 @@ from starlette.responses import JSONResponse
 from mortgage_pricing.api_foundation import ActorId
 from mortgage_pricing.errors import ErrorResponse, error_response
 from mortgage_pricing.persistence.database import create_session_factory
-from mortgage_pricing.persistence.operations import OperationError, create_request
+from mortgage_pricing.persistence.operations import MAX_DISCOUNT_BPS, OperationError, create_request
 
 router = APIRouter(tags=["requests"])
 
@@ -19,7 +19,7 @@ class CreateRequestBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     application_id: UUID
-    discount_bps: int = Field(strict=True, gt=0)
+    discount_bps: int = Field(strict=True, gt=0, le=MAX_DISCOUNT_BPS)
     reason: str = Field(min_length=1, max_length=2000)
 
 

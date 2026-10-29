@@ -231,3 +231,163 @@ Next action:
 - Observed checks: `uv run --locked python -m pytest tests/test_phase_02_acceptance.py -q` -> **1 passed**; `uv run --locked python -m pytest -q` -> **121 passed**; `uv run --locked python -m ruff check .` -> passed; `uv run --locked python -m ruff format --check .` -> **58 files already formatted**; `uv lock --check` -> **33 packages**; `uv pip check` -> **32 installed packages compatible**; `git diff --check` -> passed.
 - Acceptance evidence: existing migration tests show repeat upgrade safety, foreign-key enforcement, uniqueness, trigger-protected immutable rows, and downgrade/re-upgrade; seed tests show repeatability, unrelated-row preservation, and collision rollback; operation tests show multi-record rollback; readiness tests show safe 503 behavior without creating missing storage. The new acceptance scenario verifies their principal operational path together. Assistant inspected the actual results.
 - Limits/review: Windows/CPython 3.12.12 only. No production deployment, backup/recovery, multi-instance database behavior, live business HTTP workflow, live model, human review, human acceptance, or active work duration is claimed. Phase 03 remains unstarted.
+
+## 2026-10-29 - Phase 03: business rules, API, and final acceptance
+
+- Scope/state: implemented the six user-gated Phase 03 steps from the Phase 02 operations. Final completion began on clean `main` at `615a480` (one commit ahead of `origin/main`). The assistant made no commit/push and used only temporary synthetic databases for checks.
+- Implemented: configured demo identity, seed lookups, create/list/details/history, revisions, exact-version decisions, current-only approved pricing, error mapping, OpenAPI, and metadata-only operational events. Final review added missing HTTP read/filter/retry acceptance coverage, aligned OpenAPI validation errors with the common envelope, and rejected values beyond SQLite's signed 64-bit storage limit before writes. This technical limit is not a bank threshold.
+- Focused implementation evidence: `uv run --locked python -m pytest tests/test_api_foundation.py tests/test_api.py tests/test_errors.py -q` -> 16 passed; `uv run --locked python -m pytest tests/test_api_create.py tests/test_api_foundation.py tests/persistence/test_operations.py -q` -> 13 passed; `uv run --locked python -m pytest tests/test_api_workflow.py tests/test_api_create.py tests/persistence/test_operations.py -q` -> 14 passed; `uv run --locked python -m pytest tests/test_api_pricing.py tests/test_api_workflow.py tests/persistence/test_operations.py -q` -> 12 passed.
+- Final gate: `uv run --locked python -m pytest -q` -> 133 passed (the earlier interrupted Step 6 run passed 130 before the added acceptance tests). `uv run --locked python -m pytest tests/test_phase_03_acceptance.py -q --tb=short` -> 3 passed, including the explicit 25-to-40-bps revision/approval path and original-reference retries after later changes. The full suite was repeated after those final acceptance assertions changed and again passed 133. `uv run --locked python -m ruff check .` -> passed; `uv run --locked python -m ruff format --check .` -> 68 files formatted; `uv lock --check` -> 33 resolved packages; `uv pip check` -> 32 compatible installed packages. `git diff --check` passed with informational Windows line-ending warnings after correcting an extra trailing blank line in this log. No dependencies changed.
+- Material failures/corrections: initial lint/format findings were fixed. A new race-test assertion passed a string instead of a UUID to SQLAlchemy; corrected and rerun successfully. The first Step 5 live script imported unavailable `httpx` (the project uses `httpx2`); it stopped before HTTP requests. The standard-library HTTP client then completed live approval/decline checks. The first Step 6 response stopped after tests and left the phase records incomplete; this finalization resolves that omission. No failure was counted as acceptance evidence.
+- Live HTTP: Step 5's real Uvicorn/urllib run created both requests (201), inspected pending state (200), approved or declined as the fictional reviewer (200), retrieved pricing (200: version 1/25 bps or `none`), and inspected two-event histories with reviewer/time (200). The final command below repeats those paths and adds revision to 40 bps, no current approval while pending, stale decision 409, original creation replay 200/version 1, and final approval of version 2/40 bps. The TCP server and migrated seed database are temporary; they are distinct from TestClient fixtures.
+
+| Acceptance | Observed evidence |
+| --- | --- |
+| AC-01, AC-02 | Pricing/workflow tests and actual TCP approval/decline scenarios; exact pricing reference, reviewer, UTC time, and history |
+| AC-03 | Create tests and final acceptance test: matching and changed input, caller scope in persistence tests, new-key conflict, original-reference replay after decisions/revision |
+| AC-04 | Final acceptance test and live revision: 25 -> 40, pending suppresses pricing, old approval remains historical, version 2 approval returns 40 |
+| AC-05 | Workflow tests reject stale reviews without a new decision/history row |
+| AC-06 | Role/ownership/self-review tests; separate-request sessions/connections on file-backed SQLite for competing creates/decisions and revision-versus-decision; coherent current pending terms |
+| Atomic failures | Existing persistence failure-injection tests roll back create/retry/history and decision/history together |
+| Contract/access | Read/filter/missing-resource tests; common OpenAPI validation envelope; default-disabled/missing/unknown demo identities |
+
+- Limits/review: assistant inspected commands, responses, and code. Windows/CPython 3.12.12 only; no human review/acceptance or active duration recorded. No production authentication, cross-platform/multi-instance guarantee, backup/recovery, UI, containers, model, or private infrastructure. Lists are unpaginated; lock waits are bounded with no automatic retry. Phase 04 remains unstarted.
+
+<details>
+<summary>Exact final live HTTP command (repository root, PowerShell)</summary>
+
+```powershell
+@'
+import json
+import socket
+import tempfile
+import threading
+import time
+from pathlib import Path
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+import uvicorn
+from alembic import command
+from alembic.config import Config
+from mortgage_pricing.config import Settings
+from mortgage_pricing.main import create_app
+from mortgage_pricing.seed import APPLICATIONS, seed_database
+
+with tempfile.TemporaryDirectory(prefix="phase03-live-") as temporary:
+    settings = Settings(_env_file=None, log_level="ERROR", demo_identity_mode="header",
+        database_url=f"sqlite:///{(Path(temporary) / 'live.db').as_posix()}")
+    config = Config(str(Path("alembic.ini").resolve()))
+    config.attributes["settings"] = settings
+    command.upgrade(config, "head")
+    seed_database(settings)
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    server = uvicorn.Server(uvicorn.Config(create_app(settings), host="127.0.0.1",
+        port=port, log_level="error", access_log=False))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    def call(path, method="GET", headers=None, body=None):
+        data = json.dumps(body).encode() if body is not None else None
+        supplied = {**(headers or {}), "X-Correlation-ID": "phase03-live"}
+        if data is not None:
+            supplied["Content-Type"] = "application/json"
+        request = Request(f"http://127.0.0.1:{port}{path}", data=data,
+            method=method, headers=supplied)
+        try:
+            with urlopen(request, timeout=5) as response:
+                assert response.headers["X-Correlation-ID"] == "phase03-live"
+                return response.status, json.load(response)
+        except HTTPError as error:
+            with error:
+                return error.code, json.load(error)
+    try:
+        for _ in range(100):
+            try:
+                if call("/health")[0] == 200:
+                    break
+            except OSError:
+                time.sleep(0.05)
+        else:
+            raise RuntimeError("server did not start")
+        manager = {"X-Demo-User": "ada.manager"}
+        reviewer = {"X-Demo-User": "blake.reviewer"}
+        results = {}
+        for index, outcome in ((0, "approved"), (1, "declined")):
+            application_id = str(APPLICATIONS[index].id)
+            terms = {"application_id": application_id, "discount_bps": 25 + index,
+                "reason": "Synthetic live HTTP scenario"}
+            headers = {**manager, "Idempotency-Key": f"live-{index}"}
+            status, created = call("/requests", "POST", headers, terms)
+            assert status == 201
+            request_id = created["request_id"]
+            url = f"/requests/{request_id}"
+            pricing_url = f"/applications/{application_id}/approved-discount"
+            assert call(url, headers=manager)[1]["status"] == "pending"
+            assert call(url + "/decisions", "POST", reviewer,
+                {"expected_version": 1, "outcome": outcome})[0] == 200
+            pricing = call(pricing_url, headers=manager)[1]
+            assert pricing["status"] == ("approved" if outcome == "approved" else "none")
+            history = call(url + "/history", headers=reviewer)[1]
+            assert [event["event_type"] for event in history] == ["created", outcome]
+            assert history[-1]["actor_login"] == "blake.reviewer"
+            assert history[-1]["occurred_at"]
+            results[outcome] = {"create": status, "pricing": pricing["status"],
+                "history_events": len(history), "reviewer": history[-1]["actor_login"]}
+            if outcome == "approved":
+                assert pricing["version_number"] == 1 and pricing["discount_bps"] == 25
+                assert call(url + "/revisions", "POST", manager,
+                    {"expected_version": 1, "discount_bps": 40, "reason": "Synthetic revision"})[0] == 201
+                assert call(pricing_url, headers=reviewer)[1]["status"] == "none"
+                stale = call(url + "/decisions", "POST", reviewer,
+                    {"expected_version": 1, "outcome": "approved"})
+                assert stale[0] == 409 and stale[1]["error"]["code"] == "stale_version"
+                replay_status, replay = call("/requests", "POST", headers, terms)
+                assert replay_status == 200 and replay == {**created, "replayed": True}
+                assert call(url + "/decisions", "POST", reviewer,
+                    {"expected_version": 2, "outcome": "approved"})[0] == 200
+                current = call(pricing_url, headers=reviewer)[1]
+                assert current["version_number"] == 2 and current["discount_bps"] == 40
+                results[outcome].update(replay_version=replay["version_number"],
+                    stale_status=stale[0], current_version=2, current_discount_bps=40)
+        print(json.dumps(results, sort_keys=True))
+    finally:
+        server.should_exit = True
+        thread.join(timeout=10)
+        assert not thread.is_alive(), "server did not stop"
+'@ | uv run --locked python -
+```
+
+</details>
+
+<details>
+<summary>Exact documentation completeness/link check (PowerShell)</summary>
+
+```powershell
+@'
+import re
+from pathlib import Path
+paths = [Path('README.md'), Path('docs/project-status.md'), Path('docs/phase-03-api-contract.md'), Path('docs/phases/phase-03-business-rules-and-api.md'), Path('docs/adr/0003-business-rules-and-api.md'), Path('docs/adr/README.md'), Path('docs/handoffs/phase-03.md'), Path('docs/requirements.md'), Path('docs/architecture.md'), Path('docs/implementation-plan.md'), Path('docs/build-log.md'), Path('docs/ai-usage.md')]
+links = 0
+for path in paths:
+    raw = path.read_text(encoding='utf-8')
+    fence = chr(96) * 3
+    assert raw.count(fence) % 2 == 0, f'Unbalanced fences: {path}'
+    text = re.sub(fence + r'.*?' + fence, '', raw, flags=re.S)
+    for target in re.findall(r'\]\(([^)]+)\)', text):
+        if '://' in target or target.startswith('#'):
+            continue
+        resolved = (path.parent / target.split('#')[0]).resolve()
+        assert resolved.exists(), f'Missing {path}: {target}'
+        links += 1
+phase = Path('docs/phases/phase-03-business-rules-and-api.md').read_text(encoding='utf-8')
+assert '- [ ]' not in phase and phase.count('- [x]') == 18
+words = len(Path('docs/handoffs/phase-03.md').read_text(encoding='utf-8').split())
+print(f'{len(paths)} documentation files checked; {links} local links exist; 18 Phase 03 checkboxes checked; handoff {words} words.')
+'@ | uv run --locked python -
+```
+
+Observed: 12 documentation files, 110 local links exist, all 18 phase task/acceptance boxes checked, and handoff 287 words. This checks local link targets and fence balance, not external sites or business behavior.
+
+</details>

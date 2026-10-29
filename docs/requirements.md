@@ -51,6 +51,8 @@ These are exercise choices, not claimed bank policies. Explain and validate them
 
 Use UTC for stored timestamps and distinguish display formatting from stored values. If rates are displayed, use integer basis points or Decimal rather than floating-point arithmetic. A 25-basis-point discount equals 0.25 percentage points.
 
+Phase 03 implements these exercise policies as detailed in [ADR 0003](adr/0003-business-rules-and-api.md): both internal roles may read all records; input reasons preserve exact text and have a 2,000-character raw length limit with nonblank content. Discounts must fit SQLite's positive signed 64-bit integer storage range; this technical bound is not a bank maximum. HTTP contracts are in the [API contract](phase-03-api-contract.md); AC-01–AC-06 evidence is linked from the phase guide.
+
 ## AI scope
 
 The live feature summarises the submitted version and identifies information missing under an explicit checklist. A statement in a manager's reason is a claim, not verified evidence. The model cannot approve, decline, change status, verify external offers, or invent policy.

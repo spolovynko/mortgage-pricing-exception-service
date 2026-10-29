@@ -28,7 +28,9 @@ router = APIRouter(
     tags=["requests"],
     responses={
         401: {"model": ErrorResponse, "description": "Demo identity required"},
+        403: {"model": ErrorResponse, "description": "No internal role"},
         404: {"model": ErrorResponse, "description": "Request not found"},
+        422: {"model": ErrorResponse, "description": "Invalid path or query input"},
         503: {"model": ErrorResponse, "description": "Storage or demo identity unavailable"},
     },
 )

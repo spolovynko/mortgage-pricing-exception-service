@@ -32,6 +32,7 @@ router = APIRouter(
             },
         },
         403: {"model": ErrorResponse, "description": "No internal role"},
+        422: {"model": ErrorResponse, "description": "Invalid header input"},
         503: {"model": ErrorResponse, "description": "Demo identity or storage unavailable"},
     },
 )

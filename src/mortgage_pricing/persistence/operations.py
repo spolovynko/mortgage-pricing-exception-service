@@ -21,6 +21,8 @@ from mortgage_pricing.persistence.models import (
     UserRoleMembership,
 )
 
+MAX_DISCOUNT_BPS = 2**63 - 1  # SQLite signed integer storage limit, not a policy threshold.
+
 
 class OperationError(Exception):
     """Expected business failure; the later HTTP layer translates ``code``."""
@@ -69,6 +71,7 @@ def _validate_terms(discount_bps: int, reason: str) -> None:
     if (
         type(discount_bps) is not int
         or discount_bps <= 0
+        or discount_bps > MAX_DISCOUNT_BPS
         or not isinstance(reason, str)
         or not reason.strip()
         or len(reason) > 2000

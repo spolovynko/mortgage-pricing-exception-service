@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: Phases 01-02 are complete. Phase 03 is next and has not started. See [project status](project-status.md).
+Status: Phases 01–03 are complete; MVP1 is implemented and verified. Phase 04 is next and has not started. See [project status](project-status.md) and the [Phase 03 handoff](handoffs/phase-03.md).
 
 This plan implements the requirements and the user's agreed additions: a Python UI, optional local AI, automatic model setup, operational logging, central configuration, and one application Dockerfile with one Compose file.
 

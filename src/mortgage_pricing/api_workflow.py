@@ -10,7 +10,12 @@ from mortgage_pricing.api_foundation import ActorId
 from mortgage_pricing.errors import ErrorResponse, error_response
 from mortgage_pricing.persistence.database import create_session_factory
 from mortgage_pricing.persistence.models import DecisionOutcome
-from mortgage_pricing.persistence.operations import OperationError, decide_request, revise_request
+from mortgage_pricing.persistence.operations import (
+    MAX_DISCOUNT_BPS,
+    OperationError,
+    decide_request,
+    revise_request,
+)
 
 router = APIRouter(
     tags=["requests"],
@@ -29,7 +34,7 @@ class RevisionBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     expected_version: int = Field(strict=True, ge=1)
-    discount_bps: int = Field(strict=True, gt=0)
+    discount_bps: int = Field(strict=True, gt=0, le=MAX_DISCOUNT_BPS)
     reason: str = Field(min_length=1, max_length=2000)
 
 

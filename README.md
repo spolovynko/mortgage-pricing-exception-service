@@ -6,7 +6,7 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 Phase 01 is complete: installable Python package, locked development tools, validated configuration, health API, structured request logging, and safe correlated error responses. Its fresh-install verification passed on Windows/CPython 3.12.12 with **48 tests passing**. See the [Phase 01 handoff](docs/handoffs/phase-01.md).
 
-Phase 02 is complete. SQLite persistence, migration, repeatable synthetic seed data, atomic operations, and database readiness are available; **121 tests pass** in the workspace. `/health` reports process liveness and `/ready` checks migrated database storage. See the [Phase 02 guide](docs/phases/phase-02-database-and-seed-data.md), [ADR 0002](docs/adr/0002-database-and-seed-data.md), and [handoff](docs/handoffs/phase-02.md). Business endpoints, UI, containers, and model integration remain later-phase work.
+Phases 02 and 03 are complete. SQLite persistence, migration, synthetic seeds, and the full human approval HTTP workflow are available. `/health` reports process liveness and `/ready` checks migrated storage. See the [Phase 03 contract](docs/phase-03-api-contract.md), [ADR](docs/adr/0003-business-rules-and-api.md), [handoff](docs/handoffs/phase-03.md), and [observed acceptance evidence](docs/build-log.md#2026-10-29---phase-03-business-rules-api-and-final-acceptance). UI, containers, and model integration remain later-phase work.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -49,7 +49,7 @@ uv run --locked python -m ruff format --check .
 
 These commands use the locked project tools, rather than whichever pytest or Ruff is installed globally. Tested versions: pytest 9.2.0 and Ruff 0.17.3 on Windows/CPython 3.12.12. To apply formatting, use `uv run --locked python -m ruff format .`.
 
-pytest discovers `tests/`, uses `importlib` import mode without adding a source path, rejects unknown configuration/markers, and treats warnings as errors. Tests cover packaging, configuration, health, errors, logging, correlation isolation, persistence resource lifetimes, SQLite transactions, storage-model constraints, atomic lifecycle operations, migrations, seed behavior, and readiness. An autouse fixture clears application settings and uses temporary working directories, keeping real `.env` files out of tests. The historical Phase 01 48-test suite also passed with deliberately invalid external settings and dotenv content. The current 120-test suite creates only temporary SQLite files; no existing database, database server, Docker, or model is needed.
+pytest discovers `tests/`, uses `importlib` import mode without adding a source path, rejects unknown configuration/markers, and treats warnings as errors. Tests cover foundation, persistence, and business HTTP behavior, including permissions, retries, versions, current pricing, and competing updates. An autouse fixture clears application settings and uses temporary working directories, keeping real `.env` files out of tests. Tests create only temporary SQLite files; no existing database, database server, Docker, or model is needed. Current results are recorded in the build log.
 
 Ruff targets Python 3.12 with a 100-character line length. Enabled rule groups check common style errors (`E`), undefined/unused names and imports (`F`), import ordering (`I`), Python modernization (`UP`), likely bug patterns (`B`), and simplifications (`SIM`). The existing .gitignore covers pytest/Ruff caches and Python bytecode.
 
@@ -101,30 +101,53 @@ The same ID appears in `X-Correlation-ID` and the failure log. The request bound
 
 SQLite connections use Python 3.12+ `autocommit=False` and enforce foreign keys. The configured busy timeout bounds waits for a competing writer; callers must handle lock errors. Users have unique logins and role memberships. Mortgage applications have unique references and an owner who must hold the relationship-manager role. A unique logical request per application contains numbered versions with positive basis-point discounts, bounded nonblank reasons, submitters, and UTC timestamps. The current pointer can only refer to a version of that request. ORM edits/deletes and migration triggers prevent direct SQL changes to immutable submitted terms, decisions, history, and retry mappings. The API owns a lazy engine for `/ready`; operational schema setup uses Alembic and repeatable baseline data uses the seed command.
 
-Decisions reference exact versions and require a reviewer-role user; only one decision can exist per version. Typed history events record version, actor, and UTC time. ORM edits/deletes of these records are rejected. Step 8 operations enforce self-review and current-version checks and commit decisions with history. Step 9 must protect stored rows from direct SQL updates/deletes.
+Decisions reference exact versions and require a reviewer-role user; only one decision can exist per version. Typed history events record version, actor, and UTC time. ORM guards and migration triggers reject edits/deletes of immutable records. Atomic operations enforce self-review and current-version checks and commit decisions with history.
 
 Creation idempotency records scope a key to a caller, store a SHA-256 fingerprint of canonical input, and point to the original request's version 1. Step 8 operations fingerprint deterministic JSON of exact input and replay the original reference for the same caller/key/input; changed input conflicts. Business rows, history, and the retry mapping commit together. Alembic revision `20261029_0001` creates this schema and SQLite triggers reject direct SQL changes to immutable versions, decisions, history events, and retry records.
 
-Run `uv run --locked python -m pytest tests/persistence` to verify the persistence cases, or `uv run --locked python -m pytest` for the complete **121-test** suite. These tests use temporary probe/business tables and apply migrations to temporary database files. No application code creates tables or directories. Apply operational schema changes with `uv run --locked python -m alembic upgrade head`. See [ADR 0002](docs/adr/0002-database-and-seed-data.md) for the resource contract and limitations.
+Run `uv run --locked python -m pytest tests/persistence` to verify persistence, or `uv run --locked python -m pytest` for the complete suite. Tests apply migrations to temporary database files. No application code creates tables or directories. Apply operational schema changes with `uv run --locked python -m alembic upgrade head`. See [ADR 0002](docs/adr/0002-database-and-seed-data.md) for the resource contract and limitations.
 
-After migration, run `uv run --locked python -m mortgage_pricing.seed` to add four clearly fictional users and three fictional mortgage applications. It reserves `SYN-MORTGAGE-DEMO-CLEAN` for the future create/approve demonstration. Re-running the command is safe: it creates no duplicates and preserves unrelated existing records.
+After migration, run `uv run --locked python -m mortgage_pricing.seed` to add four clearly fictional users and three fictional mortgage applications. It reserves `SYN-MORTGAGE-DEMO-CLEAN` without requests for the create/approve demonstration. Re-running the command is safe: it creates no duplicates and preserves unrelated existing records.
 
 Set `DATABASE_URL` to the intended SQLite file before migration, for example `$env:DATABASE_URL = "sqlite:///./data/mortgage_pricing.db"` in PowerShell. Ensure its parent directory exists. Tests inject temporary database settings through Alembic configuration attributes; operational setup must use migrations rather than `Base.metadata.create_all()`.
 
 `GET /ready` returns ready only when the configured SQLite database exists and has the current Alembic revision. Storage failure returns a correlated 503. `GET /health` stays available as process liveness.
 
+## Business API (Phase 03)
+
+After migration and seeding, set `$env:DEMO_IDENTITY_MODE = "header"` before starting the Uvicorn factory with the command above. Default `off` disables business access. Open `/docs` for request/response schemas and synthetic examples. Demo identity is simulated, not production authentication.
+
+Known fictional logins are `ada.manager`, `grace.manager`, `blake.reviewer`, and `casey.reviewer`. A client can bootstrap the user selector by supplying `X-Demo-User: ada.manager` to `/demo/users`; `/demo/applications` exposes references and owners. Both internal roles can read all internal records. Only the owning manager can submit/revise; independent reviewers decide.
+
+For a deliberately prepared demo database and running local server:
+
+```powershell
+$demoHeaders = @{ "X-Demo-User" = "ada.manager" }
+$demoApps = Invoke-RestMethod http://127.0.0.1:8000/demo/applications -Headers $demoHeaders
+$demoApplication = $demoApps | Where-Object reference -eq "SYN-MORTGAGE-DEMO-CLEAN"
+$createHeaders = @{ "X-Demo-User" = "ada.manager"; "Idempotency-Key" = [guid]::NewGuid().ToString() }
+$createBody = @{ application_id = $demoApplication.id; discount_bps = 25; reason = "Synthetic retention request" } | ConvertTo-Json
+$created = Invoke-RestMethod http://127.0.0.1:8000/requests -Method Post -Headers $createHeaders -ContentType application/json -Body $createBody
+$reviewHeaders = @{ "X-Demo-User" = "blake.reviewer" }
+$decisionBody = @{ expected_version = $created.version_number; outcome = "approved" } | ConvertTo-Json
+Invoke-RestMethod "http://127.0.0.1:8000/requests/$($created.request_id)/decisions" -Method Post -Headers $reviewHeaders -ContentType application/json -Body $decisionBody
+Invoke-RestMethod "http://127.0.0.1:8000/applications/$($demoApplication.id)/approved-discount" -Headers $demoHeaders
+```
+
+Reuse the saved key and exact body when retrying creation. A new key cannot create a second logical request for that application: use revisions if it already has a request. A revision requires fresh review, and earlier approvals remain historical. No current approval returns 200 with `status: "none"`; an unknown application returns 404. Expected business conflicts return 409, invalid input 422, and unavailable or locked storage 503 without automatic retry. See the [contract](docs/phase-03-api-contract.md) for all routes, limits, history fields, and error envelopes.
+
 ## Continue implementation
 
 1. Read [project status](docs/project-status.md).
 2. Read [requirements](docs/requirements.md) and the [implementation plan](docs/implementation-plan.md).
-3. Read the [Phase 02 handoff](docs/handoffs/phase-02.md), [Phase 03 guide](docs/phases/phase-03-business-rules-and-api.md), and [ADR 0002](docs/adr/0002-database-and-seed-data.md). Phase 03 is next, only when requested.
+3. Read the [Phase 03 handoff](docs/handoffs/phase-03.md), [Phase 04 guide](docs/phases/phase-04-user-interface.md), and [ADR 0003](docs/adr/0003-business-rules-and-api.md). Phase 04 is next, only when requested.
 4. Have the agent read [AGENTS.md](AGENTS.md) before implementing that phase.
 
 Suggested phase-chat prompt:
 
 ```text
-Implement Phase 03 only. Read AGENTS.md, docs/project-status.md, the Phase 02
-handoff, the Phase 03 guide, relevant ADRs, and their required references. Inspect
+Implement Phase 04 only. Read AGENTS.md, docs/project-status.md, the Phase 03
+handoff, the Phase 04 guide, relevant ADRs, and their required references. Inspect
 Git/source state and preserve existing changes. Do not commit or push.
 ```
 
