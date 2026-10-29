@@ -180,24 +180,36 @@ Change the phase number and guide for each subsequent chat. Use the same reposit
 | [AI usage](docs/ai-usage.md) | AI contributions, review, corrections, and limitations |
 | [Repository instructions](AGENTS.md) | Working defaults and phase handoff requirements |
 
-## Planned stack
+## Stack
 
-Python, FastAPI/Uvicorn, Pydantic Settings, SQLAlchemy, SQLite, Alembic, plain HTML/CSS/JavaScript, and pytest. Phase 05 will use one application Dockerfile and one Compose file to run one application container with one Uvicorn process serving UI and API through the same host-loopback port. Optional Ollama/model-initialisation services remain Phase 06 work. See the [updated container requirement](docs/requirements.md#project-additions-selected-by-the-user).
+Python, FastAPI/Uvicorn, Pydantic Settings, SQLAlchemy, SQLite, Alembic, plain HTML/CSS/JavaScript, pytest, and one Docker Compose application service. One non-root Uvicorn process serves UI and API through the same host-loopback port. Optional Ollama/model-initialisation services remain Phase 06 work. See [ADR 0005](docs/adr/0005-containerisation.md).
 
-## Target startup experience
+## Container startup and operations
 
-These commands are **future acceptance targets** for container implementation:
+Build and start the core UI and API from the repository root:
 
 ```bash
-# Core UI and API
 docker compose up --build
-
-# Core application plus optional local AI
-docker compose --profile ai up --build
 ```
 
-The interviewer will need Docker with Compose, available local ports, and internet access for the initial image/dependency/model downloads. Cached restarts should work offline after setup. The optional model candidate is `qwen3:4b-instruct-2507-q4_K_M`; its accuracy and resource requirements still need project-specific verification.
+Open `http://127.0.0.1:8000/`. Startup validates writable storage, applies migrations, inserts missing synthetic seeds, and then starts Uvicorn. The named application-data volume preserves records across container recreation. AI infrastructure and an API key are not required.
+
+For background operation and inspection:
+
+```bash
+docker compose up --build --detach --wait
+docker compose ps
+docker compose logs --follow app
+docker compose restart app
+docker compose down
+```
+
+Normal `docker compose down` removes the container and network but preserves the named volume. `docker compose down --volumes` permanently deletes that stored database; use it only when intentionally discarding local data. No startup path resets or deletes the volume.
+
+If port 8000 is occupied, set another loopback port before startup: PowerShell `$env:APP_PORT = "8010"`; POSIX shell `APP_PORT=8010 docker compose up --build`. Check liveness at `/health` and migrated writable database readiness at `/ready`. Configuration failures and migration/seed failures stop startup and appear in `docker compose logs app`. Container logs use bounded local retention (three 10 MB files).
+
+Docker with Compose and internet access are required for the first image/dependency download. Cached restarts can work offline. The optional model candidate remains Phase 06 work; no model readiness is claimed here.
 
 ## Submission notes
 
-Record actual active work time in the build log. At handover, add verified setup commands, seed identities, demonstration steps, test results, AI evaluation results, and production limitations. Do not infer implementation progress from the existence of this scaffold.
+Active work time is not recorded. Verified container commands, demonstration evidence, and limitations are linked from the [Phase 05 handoff](docs/handoffs/phase-05.md). AI evaluation remains later work.

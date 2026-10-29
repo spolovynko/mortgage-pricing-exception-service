@@ -18,7 +18,7 @@ Reserve these names for the primary phase records. Create the file during the ph
 | 02 | [0002-database-and-seed-data.md](0002-database-and-seed-data.md) | Implemented; Phase 02 complete |
 | 03 | [0003-business-rules-and-api.md](0003-business-rules-and-api.md) | Implemented; Phase 03 complete |
 | 04 | [0004-user-interface.md](0004-user-interface.md) | Superseded by ADR 0009; Phase 04 workflow complete |
-| 05 | `0005-containerisation.md` | Not created |
+| 05 | [0005-containerisation.md](0005-containerisation.md) | Implemented; Phase 05 complete |
 | 06 | `0006-local-llm-integration.md` | Not created |
 | 07 | `0007-testing-evaluation-and-ci.md` | Not created |
 | 08 | `0008-documentation-and-handover.md` | Not created |

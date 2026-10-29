@@ -77,7 +77,11 @@ Maintain **one application Dockerfile** and **one compose.yaml**. Per the user's
 
 The browser connects directly to the application's host-loopback port. FastAPI serves HTML, CSS, JavaScript, and API routes from the same origin, preserving ADR 0009's single-process runtime and existing HTTP contracts without forwarding or CORS changes. The backend calls `http://ollama:11434` when that future service exists. Container `localhost` refers to that container, not another service. Keep Ollama internal to the Compose network unless a documented local debugging need requires otherwise. See the [updated container requirement](requirements.md#project-additions-selected-by-the-user).
 
-Use a named volume for application data; a separate model-cache volume belongs to later AI work. The combined application is the sole core service; future Ollama/model-init belong to the optional `ai` profile. Do not make core startup depend on successful model setup.
+Phase 05 implements this as a digest-pinned, multi-stage Python 3.12.12 image with uv-locked production dependencies. The runtime installs the package non-editably and includes Alembic migrations, logging configuration, and root UI assets. It runs as UID/GID 10001 with a read-only root filesystem. Compose publishes port 8000 on host loopback, mounts a named writable volume at `/app/data`, uses `/ready` as its healthcheck, and bounds the local log driver to three 10 MB files.
+
+The container entrypoint validates file-backed writable SQLite storage, upgrades to Alembic head, inserts only missing fixed synthetic seeds, and then replaces itself with Uvicorn. Preparation failures stop the service before business operations are exposed. `/ready` verifies the current schema and a rollback-only write; `/health` remains process liveness. Core startup sets `LLM_MODE=off` and has no model dependency. See [ADR 0005](adr/0005-containerisation.md).
+
+The named volume preserves business data across normal container recreation; a separate model-cache volume belongs to later AI work. The combined application is the sole core service. Future Ollama/model-init belong to Phase 06 and must not make core startup depend on successful model setup.
 
 ## Configuration and AI controls
 
@@ -93,7 +97,7 @@ The UI toggle is local to the reviewer's session. Off prevents new calls and doe
 
 ## Observability and failures
 
-Operational JSON logs go to stdout/stderr with bounded container retention. Keep correlation identifiers distinct from pricing-request IDs. Persist business history in the database. Core liveness, database readiness, and AI availability are distinct signals; a model failure must not create core restart loops.
+Operational JSON logs go to stdout/stderr with bounded container retention. Keep correlation identifiers distinct from pricing-request IDs. Persist business history in the database. Core liveness, database readiness, and AI availability are distinct signals; a model failure must not create core restart loops. Phase 05 readiness requires the current Alembic revision and writable SQLite storage, while liveness remains independent.
 
 Step 6 implements stdout JSON logging with one independent logger per app and a ContextVar for request correlation. ASGI middleware validates a single 1-64 character ASCII `X-Correlation-ID` (letter/digit first; then letters/digits/dot/underscore/hyphen), generates UUIDs for other inputs, and returns the ID on responses. Request logs contain method, matched route template, status, outcome, and duration in seconds; arbitrary request data and exception messages are excluded. Uvicorn uses the shared formatter via `config/logging.json`; the documented command disables its raw access log. See ADR 0001 for diagnostics and isolation decisions.
 
