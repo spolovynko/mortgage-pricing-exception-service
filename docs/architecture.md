@@ -71,13 +71,13 @@ The seed command runs after migrations and inserts only fixed fictional baseline
 
 Phase 03 implements create/list/inspect, submit revision, decide an exact version, history, current approved pricing, and demo identity/application lookups. The [HTTP contract](phase-03-api-contract.md) and [ADR 0003](adr/0003-business-rules-and-api.md) define validation, permissions, error codes, and 201/200 creation replay semantics. The Phase 04 follow-up adds typed, per-version context snapshots; the API remains compatible with omitted context. Both seeded internal roles read all internal records; owning managers submit/revise, independent reviewers decide. The configured demo login header simulates identity. Approved pricing returns only the current approved version, or a successful `none` outcome for an existing application without current approval. AI availability and assessment operations remain later-phase work.
 
-## Shared image and Compose
+## Application container and Compose
 
-Maintain **one application Dockerfile** and **one compose.yaml**. API, UI, and the Python model-init job use the shared application image with different commands. Ollama uses a pinned official image. The model weights are not baked into the application image or committed to Git.
+Maintain **one application Dockerfile** and **one compose.yaml**. Per the user's 2026-10-29 requirement change, one core application service runs one Uvicorn process serving both UI assets and the HTTP API. No separate UI container or reverse proxy is required. A future Python model-init job may reuse the application image; Ollama uses a pinned official image in Phase 06. The model weights are not baked into the application image or committed to Git.
 
-The browser UI uses same-origin API paths, so Phase 05 must route browser traffic to the Uvicorn instance that serves the HTML assets; a Compose-only hostname cannot be embedded as the browser API URL. Reconcile this routing with the planned API/UI container split before implementing Compose. The backend calls `http://ollama:11434` when that service exists. Container `localhost` refers to that container, not another service. Publish the browser-facing entry point to host loopback; keep Ollama internal to the Compose network unless a documented local debugging need requires otherwise.
+The browser connects directly to the application's host-loopback port. FastAPI serves HTML, CSS, JavaScript, and API routes from the same origin, preserving ADR 0009's single-process runtime and existing HTTP contracts without forwarding or CORS changes. The backend calls `http://ollama:11434` when that future service exists. Container `localhost` refers to that container, not another service. Keep Ollama internal to the Compose network unless a documented local debugging need requires otherwise. See the [updated container requirement](requirements.md#project-additions-selected-by-the-user).
 
-Use separate named volumes for application data and model cache. API/UI are core services; Ollama/model-init belong to the optional `ai` profile. Do not make core API startup depend on successful model setup.
+Use a named volume for application data; a separate model-cache volume belongs to later AI work. The combined application is the sole core service; future Ollama/model-init belong to the optional `ai` profile. Do not make core startup depend on successful model setup.
 
 ## Configuration and AI controls
 

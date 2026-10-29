@@ -182,7 +182,7 @@ Change the phase number and guide for each subsequent chat. Use the same reposit
 
 ## Planned stack
 
-Python, FastAPI/Uvicorn, Pydantic Settings, SQLAlchemy, SQLite, Alembic, plain HTML/CSS/JavaScript, and pytest. A single application Dockerfile will build an image shared by separate API, UI, and model-initialisation containers. Optional Ollama services will provide local AI assistance.
+Python, FastAPI/Uvicorn, Pydantic Settings, SQLAlchemy, SQLite, Alembic, plain HTML/CSS/JavaScript, and pytest. Phase 05 will use one application Dockerfile and one Compose file to run one application container with one Uvicorn process serving UI and API through the same host-loopback port. Optional Ollama/model-initialisation services remain Phase 06 work. See the [updated container requirement](docs/requirements.md#project-additions-selected-by-the-user).
 
 ## Target startup experience
 

@@ -19,7 +19,7 @@ At phase start read the current-position section of [project status](docs/projec
 ## Build boundaries
 
 - Follow the engineering guidelines proportionately. Enforce business rules, permissions, versions, idempotency, and decisions in the backend. Preserve reviewed versions, decision history, and transaction integrity; separate AI assessments from human decisions.
-- Keep core behavior usable without a model, GPU, paid API, or private infrastructure. Use one application Dockerfile and Compose file; API and UI have separate containers from the shared image, and Ollama uses its official image.
+- Keep core behavior usable without a model, GPU, paid API, or private infrastructure. Use one application Dockerfile and Compose file; one application container runs one Uvicorn process serving both API and UI. Future optional Ollama uses its official image.
 - Add meaningful tests for changed behavior. Use synthetic data; exclude secrets, weights, databases, and temporary files from source control. Never delete user data, volumes, models, or unrelated changes for convenience; isolate destructive tests.
 - Requirements' proposed rules are exercise defaults, not bank policy. Settle routine details in the phase ADR; surface material changes to agreed behavior or deliverables first.
 

@@ -35,6 +35,8 @@ The service does not determine whether the bank should grant the mortgage or whe
 
 Build the UI, optional local LLM integration, automated first-run model preparation, container startup, operational logging, central configuration, phase documentation, ADRs, build logs, and coding/commit guidance. These are part of our project plan even where they exceed the mandatory brief.
 
+On 2026-10-29, the user replaced the planned separate API/UI containers with one core application container running one Uvicorn process. One application Dockerfile and one compose.yaml must build/start that container; FastAPI serves both root UI assets and the HTTP API through one host-loopback port. Browser calls retain same-origin paths and existing API contracts. No separate UI service or reverse proxy is required. Persistent SQLite storage, safe migration/seeding, non-root execution, bounded logs, liveness, and database readiness remain Phase 05 requirements. Optional Ollama/model-init remain later Phase 06 work; the one-container requirement applies to the core application. See the [Phase 05 guide](phases/phase-05-containerisation.md).
+
 ## Proposed business policies
 
 These are exercise choices, not claimed bank policies. Explain and validate them in ADRs.
@@ -72,7 +74,7 @@ An optional offline LLM judge evaluates generated text against the source and a 
 | AC-07 | Repeated seeding and application restarts preserve data and do not duplicate users/applications. |
 | AC-08 | With AI off or unavailable, the human approval workflow remains usable and no new model call is made when off. |
 | AC-09 | AI assessments reference the exact submitted version, remain distinct from decisions, and cannot authorise pricing. |
-| AC-10 | A fresh evaluator can start core mode with Compose; AI mode prepares and caches a model; a subsequent cached restart can run offline. |
+| AC-10 | A fresh evaluator can build/start core mode with Compose as one application container running one Uvicorn process for both UI and API; AI mode later prepares and caches a model; a subsequent cached restart can run offline. |
 
 ## Out of scope and production follow-ups
 

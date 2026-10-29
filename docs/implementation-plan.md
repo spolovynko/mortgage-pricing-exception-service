@@ -22,7 +22,7 @@ Phases are sequential for this project. A phase can prepare an interface for a l
 ## Delivery milestones
 
 - **MVP1:** API-level create, inspect, revise, decide, history, and approved-discount retrieval work with seed data. Critical permission, retry, and competing-update cases are tested.
-- **MVP2:** A reviewer can use the complete human workflow through the containerised UI. One shared image supplies the API and UI containers. Application data survives restarts.
+- **MVP2:** A reviewer can use the complete human workflow through the containerised UI. One application container runs one Uvicorn process serving both UI and API, per the user's 2026-10-29 requirement change. Application data survives restarts.
 - **MVP3:** Optional local AI is automatically prepared and evaluated. Human approval works with assistance on, off, or unavailable. The final documentation and reproducibility checks are complete.
 
 MVP2 and MVP3 are delivery labels for this exercise, not claims of production maturity. The PDF treats a custom UI and an additional AI demonstration as bonuses; both are included in this project's agreed plan.

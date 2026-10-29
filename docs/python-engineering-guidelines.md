@@ -92,7 +92,7 @@ Ordinary tests use explicit fakes. Live evaluations run separately with the real
 
 ## Containers
 
-Use one shared application Dockerfile and one Compose file. Configure separate service commands for API, UI, and model-init. Pin the tested base/runtime images; keep model weights in a named volume. Minimise image contents with .dockerignore and use an appropriate non-root application user with verified volume permissions.
+Use one application Dockerfile and one Compose file. Configure one core application container running one Uvicorn process for UI and API; a future model-init job may reuse the image with a different command. Pin the tested base/runtime images; keep future model weights in a named volume. Minimise image contents with .dockerignore and use an appropriate non-root application user with verified volume permissions.
 
 Keep core readiness independent of optional AI. Use health checks for actual service readiness, not fixed sleeps. Default to CPU-capable execution. Publish only necessary demonstration ports on host loopback.
 

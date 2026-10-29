@@ -10,7 +10,7 @@ Last updated: 2026-10-29
 - Completed implementation phase: [Phase 02 - Database and seed data](phases/phase-02-database-and-seed-data.md). See [handoff](handoffs/phase-02.md).
 - Completed implementation phase: [Phase 03 - Business rules and API](phases/phase-03-business-rules-and-api.md). See [handoff](handoffs/phase-03.md) and [ADR 0003](adr/0003-business-rules-and-api.md).
 - Completed implementation phase: [Phase 04 - User interface](phases/phase-04-user-interface.md). Its original Streamlit runtime was replaced by the single-process HTML UI in [ADR 0009](adr/0009-single-process-html-ui.md); structured per-version request context is recorded in [ADR 0010](adr/0010-versioned-request-context.md). See [handoff](handoffs/phase-04.md), [architecture-update evidence](build-log.md#2026-10-29---phase-04-single-process-html-ui-update), and [context-extension evidence](build-log.md#2026-10-29---phase-04-structured-request-context).
-- Next action: Phase 05 containerisation; start only after a separate user instruction.
+- Next action: Phase 05 containerisation with one application container and one Uvicorn process, per the user's 2026-10-29 requirement change. Requirements are updated; container implementation awaits step authorization.
 - Project setup: Python 3.12 series, uv 0.11.6, `pyproject.toml` + `uv.lock`, `src/mortgage_pricing/__init__.py`, and ignored `.venv`. Fresh installation, isolated imports, lock consistency, and dependency consistency passed on Windows/CPython 3.12.12.
 - Development checks: the original Streamlit Phase 04 suite passed 146 tests; the single-process HTML update passed 134 tests; its structured-context extension passed the final 138-test suite. Exact commands and scope limits are in the two linked Phase 04 build entries. Windows/CPython 3.12.12 only.
 - Configuration: immutable Pydantic Settings and `.env.example` with validated modes, URLs, bounds, and documented precedence; configuration tests pass. It does not connect to a database or model.
@@ -41,7 +41,7 @@ Allowed phase states: Not started, In progress, Complete, or Incomplete - needs 
 
 - Python API and static asset serving with FastAPI; HTML/CSS/JavaScript UI; SQLite through SQLAlchemy.
 - Versioned database changes with Alembic.
-- One shared application Dockerfile and one Compose file; separate API and UI containers.
+- One application Dockerfile and one Compose file; one core application container runs one Uvicorn process serving both UI and API (user-authorized requirement change, 2026-10-29).
 - Optional Ollama and model-initialisation services selected through an `ai` profile.
 - Human approval in every operating mode. The UI toggle controls new AI assistance calls.
 - Configuration and structured logging are implemented from Phase 01.
