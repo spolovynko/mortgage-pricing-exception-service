@@ -122,3 +122,10 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Contribution: authored request/version ORM models, current-version relationship constraint, ORM immutability guard, ten isolated file-backed tests, and progress/decision records. Used PowerShell, Git, uv, pytest, Ruff, and installed SQLAlchemy.
 - Actual verification: focused version suite **10 passed**, full suite **83 passed**; final Ruff lint/format and lock/dependency checks passed. Initial helper ordering and detached-instance test failures were corrected. Exact commands and limits appear in the build log.
 - Review/limits: assistant inspected source and outputs; human review/acceptance and work duration are not recorded. Direct SQL immutability, decision/history schema, migration, seeds, and business operations remain pending. No normal database, commit, or push. Step 6 remains user-gated.
+
+## 2026-10-29 - Phase 02, Step 6: decisions and history
+
+- Task/scope: user authorized Step 6 only. Assistant inspected clean `f3ae4d1`, existing models and required records. No subagents or product-model calls were used.
+- Contribution: authored exact-version decision and typed history ORM models, their constraints and ORM immutability guards, seven isolated file-backed tests, and ADR/progress/evidence changes. Used PowerShell, Git, uv, pytest, Ruff, and installed SQLAlchemy.
+- Actual verification: seven focused tests and 90 total tests passed; final Ruff lint/format and lock/dependency checks passed. One format finding was corrected. Exact commands and limits are in the build log.
+- Review/limits: assistant inspected code/results; no human review/acceptance or duration is recorded. Self-review, stale versions, and decision/history atomicity remain operation-level work. Direct SQL immutability awaits migration triggers. No normal database, commit, or push; Step 7 remains user-gated.

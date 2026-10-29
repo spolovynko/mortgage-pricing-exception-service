@@ -1,9 +1,9 @@
 # Phase 02 - Database and seed data
 
-- Status: In progress; execution Steps 1-5 complete. Step 6 requires the user's instruction.
+- Status: In progress; execution Steps 1-6 complete. Step 7 requires the user's instruction.
 - Milestone: MVP1.
 - Prerequisite: Phase 01 complete or its unmet criteria explicitly resolved.
-- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 5 only.
+- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 6 only.
 - Handoff to create: `docs/handoffs/phase-02.md`.
 
 ## Objective
@@ -27,7 +27,7 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 3. [x] Configure and verify SQLite transactions.
 4. [x] Define users, roles, mortgage applications, and manager ownership.
 5. [x] Define logical requests and immutable submitted versions.
-6. [ ] Define decisions and append-only history.
+6. [x] Define decisions and append-only history.
 7. [ ] Define caller-scoped idempotency records.
 8. [ ] Define and verify atomic operation boundaries.
 9. [ ] Create and verify the initial Alembic migration.
@@ -84,10 +84,17 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - Ten isolated file-backed tests cover two preserved versions and the current pointer, duplicate request/version rejection, wrong or absent current version rejection, invalid or overlong terms, missing submitter, and ORM edit/delete rejection. `uv run --locked python -m pytest tests/persistence/test_request_versions.py -q`: **10 passed**. Full suite: **83 passed**; Ruff lint/format, lock and dependency checks passed. The build log records exact commands and corrections.
 - Request/version/decision/history combined task and whole-phase acceptance criteria remain unchecked until their later work is complete. No migration, seed, normal database, or business endpoint was created. Next action: Step 6 only on user instruction.
 
+### Step 6 evidence - 2026-10-29
+
+- Began from clean `main` at `f3ae4d1`, after the user committed Steps 4-5. Added `PricingDecision` for one approved/declined human decision per exact request version and `RequestHistoryEvent` for typed created/revised/approved/declined events. Each record stores actor and UTC time; neither stores a duplicate discount amount.
+- The database requires a valid version for decisions and history, one decision per version, a valid actor for history, and reviewer membership for the decision maker. ORM events reject updates/deletes of decisions and history. Direct SQL immutability still requires Step 9 migration triggers.
+- Seven isolated file-backed tests verify exact-version links, actor/time round trips, duplicate decision rejection, missing-version failures, reviewer-only authority, and ORM update/delete rejection. `uv run --locked python -m pytest tests/persistence/test_decisions_history.py -q --tb=short`: **7 passed**. Full suite: **90 passed**; final static results are in the build log.
+- A user holding both roles can still self-review at schema level; the later business service must reject it. Decision-plus-history atomicity, current-version checks, and competing writes remain Step 8 work. All phase acceptance criteria remain unchecked. Next action: Step 7 only on user instruction.
+
 ## Implementation tasks
 
 - [x] Define users/role membership and mortgage applications with a documented manager-ownership relationship.
-- [ ] Define a logical request unique per application, submitted versions, current-version reference, decisions, and history events.
+- [x] Define a logical request unique per application, submitted versions, current-version reference, decisions, and history events.
 - [ ] Define caller-scoped idempotency storage: key, canonical input fingerprint, and the original creation result/reference.
 - [ ] Decide how exact version input and actor/time metadata are preserved through application operations.
 - [ ] Define database constraints for relationships, unique version numbers, caller/key uniqueness, and at most one decision per version.

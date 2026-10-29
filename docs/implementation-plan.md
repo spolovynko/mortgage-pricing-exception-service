@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: Phase 01 complete. Phase 02 Steps 1-5 are complete; logical requests and submitted versions are modeled and decisions/history are next. See [project status](project-status.md).
+Status: Phase 01 complete. Phase 02 Steps 1-6 are complete; decisions and history are modeled and caller-scoped idempotency is next. See [project status](project-status.md).
 
 This plan implements the requirements and the user's agreed additions: a Python UI, optional local AI, automatic model setup, operational logging, central configuration, and one application Dockerfile with one Compose file.
 

@@ -177,8 +177,116 @@ class RequestVersion(Base):
     submitted_by: Mapped[User] = relationship()
 
 
+class DecisionOutcome(StrEnum):
+    APPROVED = "approved"
+    DECLINED = "declined"
+
+
+class PricingDecision(Base):
+    """One final human decision about one submitted request version."""
+
+    __tablename__ = "pricing_decisions"
+    __table_args__ = (
+        UniqueConstraint("request_id", "version_number", name="request_version"),
+        ForeignKeyConstraint(
+            ["request_id", "version_number"],
+            ["request_versions.request_id", "request_versions.version_number"],
+            ondelete="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ["reviewer_id", "reviewer_role"],
+            ["user_role_memberships.user_id", "user_role_memberships.role"],
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("reviewer_role = 'reviewer'", name="reviewer_role_is_reviewer"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    request_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    outcome: Mapped[DecisionOutcome] = mapped_column(
+        Enum(
+            DecisionOutcome,
+            name="decision_outcome",
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=lambda outcomes: [outcome.value for outcome in outcomes],
+        ),
+        nullable=False,
+    )
+    reviewer_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    reviewer_role: Mapped[Role] = mapped_column(ROLE_ENUM, default=Role.REVIEWER, nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
+
+    version: Mapped[RequestVersion] = relationship(
+        primaryjoin="and_(PricingDecision.request_id == RequestVersion.request_id, "
+        "PricingDecision.version_number == RequestVersion.version_number)",
+        foreign_keys=[request_id, version_number],
+    )
+    reviewer: Mapped[User] = relationship(
+        primaryjoin="PricingDecision.reviewer_id == User.id",
+        foreign_keys=[reviewer_id],
+    )
+
+
+class HistoryEventType(StrEnum):
+    CREATED = "created"
+    REVISED = "revised"
+    APPROVED = "approved"
+    DECLINED = "declined"
+
+
+class RequestHistoryEvent(Base):
+    """Append-only event for a business change to an exact request version."""
+
+    __tablename__ = "request_history_events"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["request_id", "version_number"],
+            ["request_versions.request_id", "request_versions.version_number"],
+            ondelete="RESTRICT",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    request_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    event_type: Mapped[HistoryEventType] = mapped_column(
+        Enum(
+            HistoryEventType,
+            name="history_event_type",
+            native_enum=False,
+            create_constraint=True,
+            validate_strings=True,
+            values_callable=lambda types: [event_type.value for event_type in types],
+        ),
+        nullable=False,
+    )
+    actor_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False
+    )
+    occurred_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
+
+    actor: Mapped[User] = relationship()
+    version: Mapped[RequestVersion] = relationship(
+        primaryjoin="and_(RequestHistoryEvent.request_id == RequestVersion.request_id, "
+        "RequestHistoryEvent.version_number == RequestVersion.version_number)",
+        foreign_keys=[request_id, version_number],
+    )
+
+
 @event.listens_for(RequestVersion, "before_update")
 @event.listens_for(RequestVersion, "before_delete")
 def protect_submitted_version(*_args: object) -> None:
     """Reject ORM mutation; Step 9 migration will also protect direct SQL writes."""
     raise ValueError("Submitted request versions cannot be changed or deleted")
+
+
+@event.listens_for(PricingDecision, "before_update")
+@event.listens_for(PricingDecision, "before_delete")
+@event.listens_for(RequestHistoryEvent, "before_update")
+@event.listens_for(RequestHistoryEvent, "before_delete")
+def protect_decision_history(*_args: object) -> None:
+    """Protect ORM records; Step 9 migration must protect direct SQL writes."""
+    raise ValueError("Decisions and history events cannot be changed or deleted")

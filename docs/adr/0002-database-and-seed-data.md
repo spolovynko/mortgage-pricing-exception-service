@@ -2,8 +2,8 @@
 
 - Date: 2026-10-29 (Europe/Brussels).
 - Phase / milestone: 02 / MVP1.
-- Status: Implemented through execution Step 5 only; Phase 02 remains in progress.
-- Implementation state: partial; SQLite configuration and user/application/request/version models verified.
+- Status: Implemented through execution Step 6 only; Phase 02 remains in progress.
+- Implementation state: partial; SQLite configuration and core request/version/decision/history models verified.
 - Decision owner or contributor: Codex assistant within the user's incremental Phase 02 requests.
 - Human acceptance: not recorded for the resulting implementation.
 - Related requirements and phase guide: NFR-01/03, DEL-02/03; [Phase 02](../phases/phase-02-database-and-seed-data.md).
@@ -38,6 +38,7 @@ The project already uses immutable central settings, explicit application factor
 - Step 4 uses UUID primary keys for internal users and mortgage applications, unique nonblank technical identifiers, and UTC-normalized timestamps that restore timezone information after SQLite reads. Users hold roles through a membership table, allowing a future user to hold both current roles. Applications reference their manager through a composite foreign key to a `relationship_manager` membership; a reviewer-only user cannot own an application. This added `manager_role` column is a fixed relational guard for that composite reference, constrained to `relationship_manager`; it is not an API input. Later services still enforce actor permissions and self-review rules.
 - Step 5 stores one `PricingRequest` per application through a unique application foreign key. `RequestVersion` has a composite `(request_id, version_number)` primary key, positive integer basis-point discount, reason length 1-2,000 after trimming, existing submitter reference, and UTC submission time. The request's nullable `current_version_number` uses a composite foreign key `(id, current_version_number)` to the version's key, preventing a pointer to another request. A new request is inserted before its first version; the pointer is set after the version exists in the same transaction. Operation-level atomicity and competing updates remain Step 8 work.
 - The ORM rejects updates and deletion of submitted versions with mapper events. This protects ordinary ORM code, while direct SQL and bulk statements can bypass it. Step 9 migration must add database triggers to reject changes to stored version rows. There is no claim of database-level immutability until that is verified. No status is stored on versions yet: a version without a Step 6 decision is pending, and only the current version will be eligible for approved-pricing retrieval.
+- Step 6 stores one `PricingDecision` per `(request_id, version_number)` with a database unique constraint and composite foreign key to the exact submitted version. Its outcome is approved or declined, and its decision maker must have reviewer membership. No discount is copied into the decision, so the version retains the authoritative reviewed amount. Typed `RequestHistoryEvent` rows reference the exact version and an existing actor. Both carry UTC timestamps. ORM mapper events reject update/delete; Step 9 migration triggers must protect direct SQL writes. Step 8 must enforce current-version, self-review, and decision-plus-history atomicity, including competing writes. Operational JSON logs remain separate from business history.
 - Add ignore rules for local `data/`, SQLite database files, and journal/WAL/shared-memory sidecars. No real settings, normal database, or existing data directory is opened or removed.
 
 ## Consequences
