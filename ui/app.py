@@ -8,7 +8,13 @@ from uuid import uuid4
 import streamlit as st
 
 from mortgage_pricing.config import get_settings
-from ui.client import ApiError, configured_client
+
+try:
+    from ui.client import ApiError, configured_client
+except ModuleNotFoundError as exc:
+    if exc.name != "ui":
+        raise
+    from client import ApiError, configured_client
 
 
 def _api_call(client: Any, method: str, path: str, login: str, **kwargs: Any) -> Any:

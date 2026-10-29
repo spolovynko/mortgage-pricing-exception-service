@@ -6,7 +6,7 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 Phase 01 is complete: installable Python package, locked development tools, validated configuration, health API, structured request logging, and safe correlated error responses. Its fresh-install verification passed on Windows/CPython 3.12.12 with **48 tests passing**. See the [Phase 01 handoff](docs/handoffs/phase-01.md).
 
-Phases 02 and 03 are complete. SQLite persistence, migration, synthetic seeds, and the full human approval HTTP workflow are available. `/health` reports process liveness and `/ready` checks migrated storage. See the [Phase 03 contract](docs/phase-03-api-contract.md), [ADR](docs/adr/0003-business-rules-and-api.md), [handoff](docs/handoffs/phase-03.md), and [observed acceptance evidence](docs/build-log.md#2026-10-29---phase-03-business-rules-api-and-final-acceptance). UI, containers, and model integration remain later-phase work.
+Phases 02–04 are complete. SQLite persistence, synthetic seeds, the human approval API, and a minimal Streamlit UI for requests, review, and history are available. `/health` reports process liveness and `/ready` checks migrated storage. The UI uses HTTP only; demo identities are simulated and assessment generation remains unavailable until Phase 06. See the [Phase 03 contract](docs/phase-03-api-contract.md), [ADR 0003](docs/adr/0003-business-rules-and-api.md), [ADR 0004](docs/adr/0004-user-interface.md), and [Phase 04 handoff](docs/handoffs/phase-04.md). Containers and model integration remain later-phase work.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -117,6 +117,10 @@ Set `DATABASE_URL` to the intended SQLite file before migration, for example `$e
 
 After migration and seeding, set `$env:DEMO_IDENTITY_MODE = "header"` before starting the Uvicorn factory with the command above. Default `off` disables business access. Open `/docs` for request/response schemas and synthetic examples. Demo identity is simulated, not production authentication.
 
+## User interface (Phase 04)
+
+With the API running, set `$env:UI_API_URL = "http://127.0.0.1:8000"` and start the UI from the repository root with `uv run --locked streamlit run ui/app.py --server.address 127.0.0.1`. The sidebar selects a fictional demo identity and offers Requests, Review (reviewers only), and History. Writes require explicit form actions; AI assistance is a session preference and assessment generation is disabled until Phase 06. See [ADR 0004](docs/adr/0004-user-interface.md), the [Phase 04 guide](docs/phases/phase-04-user-interface.md), and the [handoff](docs/handoffs/phase-04.md).
+
 Known fictional logins are `ada.manager`, `grace.manager`, `blake.reviewer`, and `casey.reviewer`. A client can bootstrap the user selector by supplying `X-Demo-User: ada.manager` to `/demo/users`; `/demo/applications` exposes references and owners. Both internal roles can read all internal records. Only the owning manager can submit/revise; independent reviewers decide.
 
 For a deliberately prepared demo database and running local server:
@@ -140,14 +144,14 @@ Reuse the saved key and exact body when retrying creation. A new key cannot crea
 
 1. Read [project status](docs/project-status.md).
 2. Read [requirements](docs/requirements.md) and the [implementation plan](docs/implementation-plan.md).
-3. Read the [Phase 03 handoff](docs/handoffs/phase-03.md), [Phase 04 guide](docs/phases/phase-04-user-interface.md), and [ADR 0003](docs/adr/0003-business-rules-and-api.md). Phase 04 is next, only when requested.
-4. Have the agent read [AGENTS.md](AGENTS.md) before implementing that phase.
+3. Read the [Phase 04 handoff](docs/handoffs/phase-04.md) and active Phase 05 guide.
+4. Have the agent read [AGENTS.md](AGENTS.md) before implementing the next phase.
 
 Suggested phase-chat prompt:
 
 ```text
-Implement Phase 04 only. Read AGENTS.md, docs/project-status.md, the Phase 03
-handoff, the Phase 04 guide, relevant ADRs, and their required references. Inspect
+Implement the next requested phase only. Read AGENTS.md, docs/project-status.md,
+the previous handoff, the active phase guide, relevant ADRs, and their required references. Inspect
 Git/source state and preserve existing changes. Do not commit or push.
 ```
 
@@ -169,7 +173,7 @@ Change the phase number and guide for each subsequent chat. Use the same reposit
 
 ## Planned stack
 
-Python, FastAPI/Uvicorn, Pydantic Settings, SQLAlchemy, SQLite, Alembic, Streamlit, HTTPX, and pytest. A single application Dockerfile will build an image shared by separate API, UI, and model-initialisation containers. Optional Ollama services will provide local AI assistance.
+Python, FastAPI/Uvicorn, Pydantic Settings, SQLAlchemy, SQLite, Alembic, Streamlit, HTTPX2, and pytest. A single application Dockerfile will build an image shared by separate API, UI, and model-initialisation containers. Optional Ollama services will provide local AI assistance.
 
 ## Target startup experience
 

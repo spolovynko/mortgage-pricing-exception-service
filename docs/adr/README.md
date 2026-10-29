@@ -17,7 +17,7 @@ Reserve these names for the primary phase records. Create the file during the ph
 | 01 | [0001-foundation-config-logging.md](0001-foundation-config-logging.md) | Implemented; Phase 01 complete |
 | 02 | [0002-database-and-seed-data.md](0002-database-and-seed-data.md) | Implemented; Phase 02 complete |
 | 03 | [0003-business-rules-and-api.md](0003-business-rules-and-api.md) | Implemented; Phase 03 complete |
-| 04 | `0004-user-interface.md` | Not created |
+| 04 | [0004-user-interface.md](0004-user-interface.md) | Implemented; Phase 04 complete |
 | 05 | `0005-containerisation.md` | Not created |
 | 06 | `0006-local-llm-integration.md` | Not created |
 | 07 | `0007-testing-evaluation-and-ci.md` | Not created |

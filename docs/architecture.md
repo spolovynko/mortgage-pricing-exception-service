@@ -1,8 +1,8 @@
 # Proposed architecture
 
-Status: Phases 01-02 are complete. Phase 02 implements persistence resources, SQLite configuration, storage models, operations, migration, seed data, and database readiness; broader application architecture remains a design baseline. Update this document as phases complete. Use ADRs for rationale.
+Status: Phases 01-04 are complete. The human UI/API workflow is implemented; container delivery and model integration remain later phases. Use ADRs for rationale.
 
-Phase 01 completed (2026-10-29): packaging, Python 3.12/uv setup, configuration, `/health`, request tracing, and safe error responses are implemented and verified with a fresh environment and 48 passing tests. Business components and dependency readiness probes remain planned. See [ADR 0001](adr/0001-foundation-config-logging.md) and the [handoff](handoffs/phase-01.md). The optional UI stub was omitted; `ui/app.py` remains a Phase 04 entry-point location.
+Phase 01 completed (2026-10-29): packaging, Python 3.12/uv setup, configuration, `/health`, request tracing, and safe error responses are implemented and verified with a fresh environment and 48 passing tests. The Phase 04 Streamlit UI is implemented in root `ui/` and calls FastAPI through HTTP only; see [ADR 0004](adr/0004-user-interface.md) and the [handoff](handoffs/phase-04.md). The root UI directory is excluded from the Python wheel and must be included by the Phase 05 shared runtime image.
 
 ## Components and boundaries
 
@@ -42,7 +42,7 @@ src/mortgage_pricing/
   ai/
 ui/
   app.py
-  api_client.py
+  client.py
 scripts/
   init_model.py
   evaluate_ai.py
