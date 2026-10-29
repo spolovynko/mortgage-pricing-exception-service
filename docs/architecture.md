@@ -70,7 +70,7 @@ Use separate named volumes for application data and model cache. API/UI are core
 
 ## Configuration and AI controls
 
-Use validated environment settings with documented defaults. Proposed `LLM_MODE` values are `off` and `auto`: `auto` permits bounded availability discovery but never automatically starts an assessment. It allows the same API configuration to work with or without the Compose AI profile. Profile activation alone does not change API environment variables.
+Use the immutable Pydantic Settings model in `src/mortgage_pricing/config.py`, loaded on demand so application setup and tests can use explicit settings. Values resolve in this order: constructor input, process environment, `.env`, then defaults. `.env.example` documents safe local defaults; real `.env` files are gitignored. `LLM_MODE` accepts `off` and `auto`: `auto` permits later bounded availability discovery but never automatically starts an assessment. It allows the same API configuration to work with or without the Compose AI profile. Profile activation alone does not change API environment variables. Step 4 settings are configuration only and do not establish database/model connections.
 
 There are three independent facts:
 

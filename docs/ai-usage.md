@@ -52,3 +52,10 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Actual verification: pytest **1 passed**; Ruff lint and format checks passed; lock/dependency consistency passed. Ruff's file listing confirmed intended configuration/source/test discovery. Exact commands and final static checks are recorded in the build log.
 - Review/limits: assistant inspected generated output and actual tool results. Human acceptance of Step 3 is not recorded. The test verifies installed-package availability and distribution metadata; it establishes no API/configuration/logging/business behavior. Only Windows/CPython 3.12.12 was tested; no duration or production/model-quality claim is made.
 - Continuation: Step 4 remains unstarted; Phase 01 remains incomplete. The assistant created no commits or pushes.
+
+## 2026-10-29 - Phase 01, Step 4: central configuration
+
+- Task/scope: implement central configuration only. Assistant inspected current files and worktree at `986bd18` before edits.
+- Contribution: authored immutable Pydantic settings, `.env.example`, configuration tests, and related README/ADR/architecture/status/checklist/build-log updates. Used PowerShell, Git, uv, Python, pytest, Ruff, and the existing local project documentation. No subagents, API/model calls, or external sources were used.
+- Actual verification: `uv run --locked python -m pytest` -> 12 passed; Ruff lint/format, lock consistency, installed dependency checks, and `git diff --check` passed. See [build log](build-log.md) for exact commands, environment, and the initial assertion correction.
+- Review/limits: assistant inspected tool output. Human review and acceptance are not recorded. The tests validate settings construction only, not app startup, health/errors, logging, database/model operations, or platform compatibility. No duration is recorded. Phase remains incomplete; no commit/push was made.

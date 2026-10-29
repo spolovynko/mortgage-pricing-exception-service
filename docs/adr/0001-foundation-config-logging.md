@@ -2,9 +2,9 @@
 
 - Date: 2026-10-29 (Europe/Brussels).
 - Phase / milestone: 01 / MVP1.
-- Status: Implemented for Steps 2-3 project setup and development checks only.
-- Implementation state: partial phase; project setup and development checks verified, remaining foundation decisions pending.
-- Decision owner or contributor: Codex assistant within the user's separate Step 2 and Step 3 requests.
+- Status: Implemented for Steps 2-4 project setup, development checks, and configuration only.
+- Implementation state: partial phase; configuration is verified, API/logging/error handling decisions and implementation remain pending.
+- Decision owner or contributor: Codex assistant within the user's separate Step 2, Step 3, and Step 4 requests.
 - Human acceptance: not recorded for the resulting implementation.
 - Related requirements and phase guide: NFR-01, NFR-03, DEL-01/02/03; [Phase 01](../phases/phase-01-foundation-config-logging.md).
 
@@ -13,6 +13,8 @@
 The repository was a clean documentation scaffold on `main` at `4e756fe`. The user requested incremental work and authorised only Step 2: Python baseline, dependency workflow, project metadata, installable package, virtual environment, and minimal dependencies. API/configuration/logging and development checks remain later steps. Python 3.12 is the planning baseline; it and uv are already installed locally.
 
 Step 3 was subsequently requested separately. Its initial working tree was clean, with Step 2 committed as `d135997`. The authorised addition is development-check tooling and verification; configuration/API implementation remains deferred.
+
+Step 4 was then requested with a clean worktree following the Step 3 commit `986bd18`. Configuration is the only authorized behavior in this increment; API, logging, error envelopes, and all later-phase work remain deferred.
 
 ## Options considered
 
@@ -27,11 +29,13 @@ Step 3 was subsequently requested separately. Its initial working tree was clean
 - Use the Python 3.12 series: `.python-version` selects it and `requires-python = ">=3.12,<3.13"` bounds the supported series. Verification used the available CPython 3.12.12; this is not a claim that the patch is the newest release.
 - Use uv 0.11.6 with `pyproject.toml` and `uv.lock`. `uv sync --locked` creates `.venv` and an editable installation, rejecting stale lock metadata. Runtime resolutions/hashes are recorded in `uv.lock`; Hatchling 1.30.1 is the pinned build backend. Do not maintain a second dependency list.
 - Use a `src/mortgage_pricing` package, currently containing only `__init__.py`. The distribution name is `mortgage-pricing-exception-service`, version `0.1.0`; the import name uses underscores. No unused application layers are created.
-- Runtime dependencies remain FastAPI, Uvicorn, and Pydantic Settings, plus their resolved transitive dependencies. These prepare the agreed foundation without implementing it. Step 3 adds pytest and Ruff in the `dev` dependency group with their resolved versions in the same lockfile. Preserve the existing .gitignore, which already excludes `.venv`, bytecode, and tool caches.
+- Runtime dependencies remain FastAPI, Uvicorn, and Pydantic Settings, plus their resolved transitive dependencies. Step 4 uses Pydantic Settings for one immutable `Settings` model with an on-demand loader instead of a cached global, so tests and future app setup can inject isolated values. Configuration precedence follows Pydantic Settings: explicit constructor values, process environment, dotenv, then defaults. `.env.example` contains safe values; the existing .gitignore excludes the real `.env` file.
+- Validate app environment, log level, demo identity mode, and `LLM_MODE` with literal choices; constrain model name and timeout, validate service URL shapes, and accept only SQLite/PostgreSQL database URL schemes without creating storage or connecting. Use `LLM_MODE=off` and demo identity `off` by default. `auto` is reserved for capability discovery and must not start assessment inference. AI endpoint/model settings are inert configuration only.
+- Step 3 adds pytest and Ruff in the `dev` dependency group with their resolved versions in the same lockfile. Preserve the existing .gitignore, which already excludes `.venv`, bytecode, and tool caches.
 - Configure pytest discovery under `tests/`, `importlib` import mode, strict configuration/markers, and warnings as errors. Do not add a `pythonpath` workaround. A packaging integration test runs an isolated interpreter from a temporary directory, checking that imports and distribution metadata work independently of the repository working directory. No placeholder API or synthetic business test is needed at this step.
 - Configure Ruff in `pyproject.toml` for Python 3.12, a 100-character line length, and `E`, `F`, `I`, `UP`, `B`, `SIM` lint groups. Use the same tool for formatting. Run tools through `uv run --locked python -m ...` so project versions are selected consistently; do not add CI or pre-commit automation in this step.
 
-Configuration precedence, tracing, error/log contracts, demo identity behavior, and UI location decisions will be added when their steps are implemented. No business policy changed.
+Configuration precedence and accepted modes are implemented as above. Tracing, error/log contracts, runtime demo identity behavior, and UI implementation remain for their later Phase 01 steps. No business policy changed.
 
 ## Consequences
 
@@ -55,6 +59,12 @@ The package imports through an isolated virtual environment and normal setup reu
 - `uv run --locked python -m ruff check .`: all checks passed. `uv run --locked python -m ruff format --check .`: passed.
 - `uv lock --check` and `uv pip check`: passed. `ruff check --show-files` confirmed discovery includes the project configuration, source package, and test file.
 - Limits: Windows/CPython 3.12.12 only; no configuration/health/logging/error behavior or business workflow has been tested. Strict warning handling may expose future dependency deprecations; address observed issues specifically rather than broadly suppressing warnings. Phase 01 acceptance remains incomplete.
+
+### Step 4 evidence
+
+- `uv run --locked python -m pytest`: **12 passed**, including 11 configuration cases and the prior packaging test. Configuration checks cover default modes, environment and dotenv precedence, invalid modes/bounds/database scheme, safe error display, and immutability.
+- `uv run --locked python -m ruff check .`: passed. `uv run --locked python -m ruff format --check .`: passed. `uv lock --check`: passed with 24 packages. `uv pip check`: all installed packages compatible. `git diff --check`: passed; Git printed an informational LF-to-CRLF working-copy warning.
+- Limits: Windows/CPython 3.12.12 only. Settings construction was tested; no app factory/startup, health endpoint, logging, HTTP error handling, database connection, model discovery/inference, or other application behavior is implemented or verified. Phase 01 remains incomplete; acceptance checkboxes are not complete.
 
 ## Alternatives rejected and revisit conditions
 

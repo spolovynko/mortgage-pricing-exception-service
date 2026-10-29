@@ -1,6 +1,6 @@
 # Phase 01 - Foundation, configuration, and logging
 
-- Status: In progress (Steps 2-3 project setup and development checks verified; phase incomplete).
+- Status: In progress (Steps 2-4 project setup, development checks, and central configuration verified; phase incomplete).
 - Milestone: MVP1.
 - Prerequisite: documentation scaffold; inspect actual repository state.
 - Primary ADR to create: `docs/adr/0001-foundation-config-logging.md`.
@@ -21,11 +21,11 @@ Establish the installable `mortgage_pricing` package under src/, tests/, UI entr
 ## Implementation tasks
 
 - [x] Inspect existing changes and prerequisites; do not overwrite user work.
-- [ ] Translate any remaining scope ambiguity into explicit ADR assumptions, preserving the proposed requirements unless a material change is authorised.
+- [x] Record the Step 4 configuration assumptions in ADR 0001, preserving proposed modes and defaults.
 - [x] Create project metadata, dependency/lock configuration, .gitignore, and documented local installation steps. Existing .gitignore already covers the virtual environment and bytecode and was preserved.
 - [ ] Create the minimal API application with an application factory or equivalent testable setup and a process health endpoint.
-- [ ] Add central Pydantic Settings and .env.example. Cover application environment, log level, database URL, demo identity mode, UI API address, and reserved AI settings.
-- [ ] Define `LLM_MODE=off|auto`: auto permits later capability discovery, not automatic inference. No live AI is needed in this phase.
+- [x] Add central Pydantic Settings and .env.example. Cover application environment, log level, database URL, demo identity mode, UI API address, and reserved AI settings.
+- [x] Define `LLM_MODE=off|auto`: auto permits later capability discovery, not automatic inference. No live AI is needed in this phase.
 - [ ] Add JSON logging with timestamp, severity, event, correlation_id, outcome, and duration; domain IDs are added when available.
 - [ ] Bound/validate supplied correlation identifiers, return the operation identifier to callers, and avoid raw body/secret logging.
 - [ ] Establish a consistent error envelope. Unexpected failures receive a safe response and useful server-side diagnostics.
@@ -40,7 +40,11 @@ The user requested one agreed step at a time. Step 1 inspected the baseline. Ste
 
 Step 3 now adds pytest/Ruff as locked development dependencies, configuration in `pyproject.toml`, documented commands, and one packaging integration test under `tests/`. `uv run --locked python -m pytest` observed **1 passed**. Ruff lint/format checks, lock consistency, and installed-dependency consistency passed. The test checks installation from a temporary working directory using an isolated interpreter; it does not exercise application behavior.
 
-Next is Step 4: central configuration. No API, settings implementation, logging, or error handling has been created. All phase acceptance criteria below remain unchecked; tooling and a packaging test do not complete the foundation's behavioral criteria. The phase handoff will be written at phase completion.
+### Step 4 - central configuration (2026-10-29)
+
+Added immutable `Settings` in `src/mortgage_pricing/config.py` with validated application/log/demo identity/LLM modes, database URL scheme, service URLs, model name, and bounded timeout. Added `.env.example`, documenting precedence (constructor > process environment > `.env` > defaults), and isolated tests for defaults, environment and dotenv precedence, rejected values, safe validation errors, and immutability. Defaults leave demo identity and AI off. `LLM_MODE=auto` is configuration for future capability discovery only. Database settings are not used to connect or create storage. README includes the configuration contract and test command. No API, logging, or error-response behavior has been implemented.
+
+Observed checks: `uv run --locked python -m pytest` -> **12 passed** (including existing packaging test); `uv run --locked python -m ruff check .` -> passed; `uv run --locked python -m ruff format --check .` -> passed after formatting one source file; `uv lock --check` -> passed (24 packages); `uv pip check` -> all installed packages compatible; `git diff --check` -> passed (Git emitted its informational LF-to-CRLF conversion warning). Windows / CPython 3.12.12, pytest 9.2.0, Ruff 0.17.3, uv 0.11.6. These checks cover configuration and packaging only. All Phase 01 acceptance criteria remain unchecked; the handoff remains due at phase completion.
 
 Test settings defaults, environment overrides, invalid values, isolated test settings, health responses, correlation propagation, and safe error/log behaviour. Tests must not require a real database, Docker, an external network, or a model.
 

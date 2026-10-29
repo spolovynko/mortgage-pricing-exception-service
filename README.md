@@ -4,7 +4,7 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 ## Current state
 
-Phase 01 is in progress. Steps 2-3 supply an installable `mortgage_pricing` package, an isolated Python environment, locked dependencies, and configured development checks. One packaging test passes, along with lint/format checks. The API, configuration, logging, UI, Dockerfile, Compose configuration, and model setup have **not** been implemented; application behavior and models remain untested.
+Phase 01 is in progress. Steps 2-4 supply an installable `mortgage_pricing` package, an isolated Python environment, locked dependencies, development checks, and validated central configuration. The API, structured logging, UI, Dockerfile, Compose configuration, and model setup have **not** been implemented; application behavior remains mostly untested.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -30,7 +30,7 @@ uv pip check
 uv run --locked python -I -c "import mortgage_pricing, fastapi, pydantic_settings, uvicorn; print(mortgage_pricing.__file__)"
 ```
 
-No activation is required. Python's `-I` mode excludes the current directory and `PYTHONPATH`, so the import checks the installed package. The only package source is currently `src/mortgage_pricing/__init__.py`; no server command exists yet. Runtime dependencies are FastAPI, Uvicorn, and Pydantic Settings. pytest and Ruff are development dependencies in the `dev` group, installed by the setup command above.
+No activation is required. Python's `-I` mode excludes the current directory and `PYTHONPATH`, so the import checks the installed package. The package currently contains its initializer and central settings model; no server command exists yet. Runtime dependencies are FastAPI, Uvicorn, and Pydantic Settings. pytest and Ruff are development dependencies in the `dev` group, installed by the setup command above.
 
 For deliberate dependency changes, use `uv add <package>` and review both dependency files. Normal setup uses `--locked` so stale metadata fails rather than silently updating the lock. See [ADR 0001](docs/adr/0001-foundation-config-logging.md) for rationale and verification limits.
 
@@ -51,11 +51,23 @@ pytest discovers `tests/`, uses `importlib` import mode without adding a source 
 
 Ruff targets Python 3.12 with a 100-character line length. Enabled rule groups check common style errors (`E`), undefined/unused names and imports (`F`), import ordering (`I`), Python modernization (`UP`), likely bug patterns (`B`), and simplifications (`SIM`). The existing .gitignore covers pytest/Ruff caches and Python bytecode.
 
+## Configuration (Step 4)
+
+`mortgage_pricing.config.Settings` is the central, immutable settings model. Defaults are safe for local development: demo identity is off and `LLM_MODE` is off. Copy `.env.example` to `.env` to override values locally; `.env` is gitignored. Precedence is explicit constructor values, process environment, `.env`, then code defaults. Tests pass isolated settings or disable `.env` loading so they do not depend on a developer's machine.
+
+Accepted modes and bounds are validated while constructing `Settings`. Supported environment values are development/test/production; log levels DEBUG/INFO/WARNING/ERROR/CRITICAL; demo identity off/header; and LLM mode off/auto. `auto` reserves capability discovery only; it does not run assessment inference. The database URL currently accepts SQLite and PostgreSQL schemes, without connecting to or creating a database. AI settings are configuration only; no model integration is implemented. When service containers are added, their addresses will need container-specific overrides.
+
+Verify configuration with:
+
+```powershell
+uv run --locked python -m pytest tests/test_config.py
+```
+
 ## Start here
 
 1. Read [project status](docs/project-status.md).
 2. Read [requirements](docs/requirements.md) and the [implementation plan](docs/implementation-plan.md).
-3. Continue [Phase 01](docs/phases/phase-01-foundation-config-logging.md) one agreed step at a time. Step 4 (central configuration) is next.
+3. Continue [Phase 01](docs/phases/phase-01-foundation-config-logging.md) one agreed step at a time. Step 5 (minimal API and health endpoint) is next.
 4. Have the agent read [AGENTS.md](AGENTS.md) before implementing that phase.
 
 Suggested phase-chat prompt:
