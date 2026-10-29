@@ -1,9 +1,9 @@
 # Phase 02 - Database and seed data
 
-- Status: In progress; execution Steps 1-10 complete. Step 11 requires the user's instruction.
+- Status: In progress; execution Steps 1-11 complete. Step 12 requires the user's instruction.
 - Milestone: MVP1.
 - Prerequisite: Phase 01 complete or its unmet criteria explicitly resolved.
-- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 10 only.
+- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 11 only.
 - Handoff to create: `docs/handoffs/phase-02.md`.
 
 ## Objective
@@ -32,7 +32,7 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 8. [x] Define and verify atomic operation boundaries.
 9. [x] Create and verify the initial Alembic migration.
 10. [x] Add repeatable synthetic seed data.
-11. [ ] Add database readiness without changing process liveness.
+11. [x] Add database readiness without changing process liveness.
 12. [ ] Run final verification and complete Phase 02 records and handoff.
 
 ### Step 1 evidence - 2026-10-29
@@ -119,6 +119,12 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - The command is `uv run --locked python -m mortgage_pricing.seed` after `uv run --locked python -m alembic upgrade head`. It writes only a JSON success/failure event and outcome metadata; record contents are not logged. Five isolated file-backed tests verify repeatability, clean demo state, unrelated-data preservation, collision rollback, failure against an unmigrated database, and the module command's safe output. Focused **5 passed**; full suite **118 passed**. Static/dependency checks are in the build log.
 - No normal database was opened during verification. API readiness and the final phase acceptance/handover remain pending; Step 11 requires the user's instruction.
 
+### Step 11 evidence - 2026-10-29
+
+- Began from clean `main` at `54acbdc`. The API now exposes `GET /ready`, which checks that the configured SQLite file exists and carries the current Alembic revision. A missing or unmigrated database returns a correlated 503 with the shared safe error envelope. `GET /health` remains process liveness; no AI dependency is probed.
+- The app owns a lazy database engine and disposes it during lifespan shutdown. The readiness probe does not create an absent database. Two isolated API tests cover migrated, unmigrated, and missing storage, as well as liveness during storage failure. Focused **2 passed**; full suite **120 passed**. Final static checks are in the build log.
+- Phase 02 acceptance and handoff remain Step 12 work. No normal database was opened or reset. Step 12 requires the user's instruction.
+
 ## Implementation tasks
 
 - [x] Define users/role membership and mortgage applications with a documented manager-ownership relationship.
@@ -130,7 +136,7 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - [x] Create and verify the initial Alembic migration. Do not rely on wiping the database to evolve the schema.
 - [x] Add repeatable seed data: at least two managers, two reviewers, and three clearly fictional applications. Reserve a clean application for the create/approve demo.
 - [ ] Optionally include clearly fictional approved/declined examples, with coherent historical versions/events rather than fabricated live decisions.
-- [ ] Add database access to core readiness; keep process liveness separate and avoid optional AI dependencies.
+- [x] Add database access to core readiness; keep process liveness separate and avoid optional AI dependencies.
 - [ ] Add seed/migration operational logs without sensitive record dumps.
 
 ## Verification

@@ -157,3 +157,9 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Contribution: authored the synthetic seed module, stable fictional identities, transaction/conflict behavior, four isolated migration-backed tests, and related decision/progress evidence. Used PowerShell, Git, uv, Alembic, pytest, Ruff, and installed SQLAlchemy.
 - Actual verification: five focused seed tests and 118 total tests passed; final Ruff lint/format and lock/dependency checks passed. Exact commands and limits are in the build log.
 - Review/limits: assistant reviewed code/results; human review/acceptance and duration are not recorded. Database readiness and final phase acceptance/handover remain pending. No normal database, commit, or push. Step 11 is user-gated.
+
+## 2026-10-29 - Phase 02, Step 11: database readiness
+
+- Task/scope: user authorized Step 11 only. Assistant inspected clean `54acbdc`, API and persistence boundaries, and phase records. No subagents or product-model calls were used.
+- Contribution: added database readiness and engine lifecycle, two isolated API tests, and progress/decision evidence. Used PowerShell, Git, uv, pytest, Ruff, SQLAlchemy, and Alembic.
+- Verification/review: focused 2 and full 120 tests passed. Assistant inspected results; human review/acceptance and duration are not recorded. Final static results are in the build log. Step 12 remains user-gated.

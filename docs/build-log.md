@@ -215,3 +215,11 @@ Next action:
 - Tests: `uv run --locked python -m pytest tests/persistence/test_seed.py -q --tb=short` -> **5 passed**. Temporary file-backed migration/seed cases cover repeat execution, clean demo state, unrelated data, rollback on collision, missing schema, and safe command output. Full `uv run --locked python -m pytest -q` -> **118 passed**.
 - Final checks: `uv run --locked python -m ruff check .` -> passed; `uv run --locked python -m ruff format --check .` -> **55 files already formatted**; `uv lock --check` -> **33 packages**; `uv pip check` -> **32 compatible packages**.
 - Limits/review: no normal database was opened or seeded. No sample requests, decisions, or history are created. API readiness and final phase acceptance remain pending. Assistant inspected code/results; human review/acceptance and active time are not recorded. No commit/push. Step 11 requires user instruction.
+
+## 2026-10-29 - Phase 02, Step 11: database readiness
+
+- Scope/state: user authorized Step 11 only. Began from clean `main` at `54acbdc`; inspected API, settings, persistence factory, error envelope, and phase records.
+- Work: added `GET /ready` to check an existing configured SQLite file and current Alembic revision. Missing or unmigrated storage returns safe correlated 503; `/health` remains process liveness. The app owns a lazy engine and disposes it at lifespan shutdown. No optional AI probe or schema creation.
+- Tests: `uv run --locked python -m pytest tests/test_readiness.py -q --tb=short` -> **2 passed**. Temporary databases cover migrated readiness, missing/unmigrated 503, no absent-file creation, and healthy process liveness during storage failure. Full `uv run --locked python -m pytest -q` -> **120 passed**. Initial Ruff lint/format findings were corrected.
+- Final static checks: `uv run --locked python -m ruff check .` passed; `uv run --locked python -m ruff format --check .` -> **56 files already formatted**; `git diff --check` passed with informational LF-to-CRLF warnings.
+- Limits/review: whole-phase acceptance and handoff remain Step 12. No normal database, commit, or push; no human review/acceptance or active time recorded.

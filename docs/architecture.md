@@ -1,6 +1,6 @@
 # Proposed architecture
 
-Status: Phase 01 foundation and Phase 02 Steps 2-10 persistence resources, SQLite transaction configuration, storage models, atomic operations, initial migration, and seed data implemented; broader application architecture remains a design baseline. Update this document as phases complete. Use ADRs for the rationale behind decisions.
+Status: Phase 01 foundation and Phase 02 Steps 2-11 persistence resources, SQLite configuration, storage models, operations, migration, seed data, and database readiness implemented; broader application architecture remains a design baseline. Update this document as phases complete. Use ADRs for rationale.
 
 Phase 01 completed (2026-10-29): packaging, Python 3.12/uv setup, configuration, `/health`, request tracing, and safe error responses are implemented and verified with a fresh environment and 48 passing tests. Business components and dependency readiness probes remain planned. See [ADR 0001](adr/0001-foundation-config-logging.md) and the [handoff](handoffs/phase-01.md). The optional UI stub was omitted; `ui/app.py` remains a Phase 04 entry-point location.
 
@@ -63,6 +63,8 @@ A logical request belongs to one application and contains numbered versions. The
 Step 8 operations use a first-statement no-op UPDATE of the application or request to obtain SQLite's writer lock before mutable reads. Competing writers then serialize and recheck state or receive a bounded lock error; there is no automatic retry. Unique keys remain database-enforced. File-backed tests verify competing decisions/revisions and rollback of failed multi-row writes. Alembic revision `20261029_0001` also adds SQLite triggers that reject direct SQL mutations of immutable rows. See [ADR 0002](adr/0002-database-and-seed-data.md).
 
 The seed command runs after migrations and inserts only fixed fictional baseline identities and applications. Re-running it preserves unrelated data and does not manufacture pending or decided requests. A clean seeded application remains available for the later create/approve demonstration.
+
+`GET /ready` checks for an existing SQLite file at the current Alembic revision and returns a safe 503 when it cannot use that storage. `GET /health` remains process liveness. The app owns a lazy engine and disposes it at shutdown; optional AI is outside core readiness. See [ADR 0002](adr/0002-database-and-seed-data.md).
 
 The HTTP contract is settled in Phase 03. Expected operations are create/list/inspect, submit revision, decide an exact version, retrieve history, retrieve approved pricing, report health, report AI availability, and explicitly generate an assessment. Define stable machine-readable error codes alongside useful messages.
 

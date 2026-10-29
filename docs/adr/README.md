@@ -4,7 +4,7 @@ ADRs explain a consequential choice, its alternatives, and its trade-offs. Use t
 
 ADR 0001 records the completed Phase 01 foundation and verification. Its status is Implemented; human acceptance is not recorded. Planning proposals for later phases remain in [requirements](../requirements.md) and [architecture](../architecture.md).
 
-ADR 0002 records the Phase 02 resource/configuration foundation, SQLite transaction behavior, business/idempotency models, atomic operations, initial migration, and seed data. It is Implemented through execution Step 10 only; readiness and phase acceptance remain pending.
+ADR 0002 records the Phase 02 resource/configuration foundation, SQLite transaction behavior, business/idempotency models, atomic operations, initial migration, seed data, and readiness. It is Implemented through execution Step 11 only; final phase acceptance remains pending.
 
 ## Primary phase records
 
@@ -13,7 +13,7 @@ Reserve these names for the primary phase records. Create the file during the ph
 | Phase | Expected primary ADR | Current state |
 | --- | --- | --- |
 | 01 | [0001-foundation-config-logging.md](0001-foundation-config-logging.md) | Implemented; Phase 01 complete |
-| 02 | [0002-database-and-seed-data.md](0002-database-and-seed-data.md) | Implemented through Step 10 only; phase in progress |
+| 02 | [0002-database-and-seed-data.md](0002-database-and-seed-data.md) | Implemented through Step 11 only; phase in progress |
 | 03 | `0003-business-rules-and-api.md` | Not created |
 | 04 | `0004-user-interface.md` | Not created |
 | 05 | `0005-containerisation.md` | Not created |

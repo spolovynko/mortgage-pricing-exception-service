@@ -2,7 +2,7 @@
 
 - Date: 2026-10-29 (Europe/Brussels).
 - Phase / milestone: 02 / MVP1.
-- Status: Implemented through execution Step 10 only; Phase 02 remains in progress.
+- Status: Implemented through execution Step 11 only; Phase 02 remains in progress.
 - Implementation state: partial; SQLite configuration, storage models, atomic operations, initial migration, and seed data verified.
 - Decision owner or contributor: Codex assistant within the user's incremental Phase 02 requests.
 - Human acceptance: not recorded for the resulting implementation.
@@ -44,6 +44,7 @@ The project already uses immutable central settings, explicit application factor
 - Each write operation first performs a no-op UPDATE of its existing application or request row. SQLite obtains its single-writer lock before state reads, so competing writes serialize and recheck current state; a bounded busy failure propagates without automatic retry. This is a pragmatic SQLite-specific lock acquisition under the current `autocommit=False` transaction configuration. A future PostgreSQL implementation needs a different locking strategy. Tests use isolated files and real competing connections; no HTTP business contract is introduced here.
 - Step 9 configures Alembic to load validated `Settings` only when invoked, then applies explicit revision `20261029_0001`. It creates every Phase 02 table and database constraint without any startup schema creation. The initial revision adds SQLite `BEFORE UPDATE` and `BEFORE DELETE` triggers for submitted versions, decisions, history events, and retry mappings, extending ORM protection to direct SQL. The request/current-version foreign-key cycle uses `use_alter=True` in metadata so migration tooling can order it. SQLite reflection still produces false positive unique-constraint differences during `alembic check`; applied-schema tests verify this migration instead. Downgrade removes triggers before dropping the tables.
 - Step 10 uses fixed UUIDv5 identities and technical references for four clearly fictional users and three fictional applications. It reserves `SYN-MORTGAGE-DEMO-CLEAN` without a request, version, decision, or history so later work can demonstrate the complete creation and approval flow. The seed function opens a short transaction only after migration; it creates missing matching records, leaves unrelated rows untouched, and rejects identifier/content collisions rather than overwriting a local record. The command logs only a seed event and outcome. No artificial decisions are seeded.
+- Step 11 adds a separate `/ready` probe: it requires an existing SQLite file and the expected Alembic revision, then reports ready. Missing, inaccessible, or unmigrated storage yields a safe correlated 503. `/health` continues to report process liveness. The app creates a lazy engine and disposes it at shutdown; readiness does not initialize schema or optional AI.
 - Add ignore rules for local `data/`, SQLite database files, and journal/WAL/shared-memory sidecars. No real settings, normal database, or existing data directory is opened or removed.
 
 ## Consequences
