@@ -1,6 +1,6 @@
 # Phase 03 HTTP contract (Step 1)
 
-This is the contract for the Phase 03 endpoints. The demo lookups and request create, read, revision, and decision routes are implemented; approved-pricing retrieval follows in a later authorized step. All IDs are UUIDs; timestamps are UTC ISO 8601; discounts are positive integer basis points. Request bodies reject unknown fields. Reasons contain 1–2,000 nonblank characters. These limits are technical validation, not bank policy.
+This is the contract for the Phase 03 endpoints. The demo lookups and all listed business routes are implemented. All IDs are UUIDs; timestamps are UTC ISO 8601; discounts are positive integer basis points. Request bodies reject unknown fields. Reasons contain 1–2,000 nonblank characters. These limits are technical validation, not bank policy.
 
 ## Identity and access
 
