@@ -1,6 +1,6 @@
 # Phase 03 HTTP contract (Step 1)
 
-This is the contract for the Phase 03 endpoints. Routes beyond the demo lookups are implemented in later authorized steps. All IDs are UUIDs; timestamps are UTC ISO 8601; discounts are positive integer basis points. Request bodies reject unknown fields. Reasons contain 1–2,000 nonblank characters. These limits are technical validation, not bank policy.
+This is the contract for the Phase 03 endpoints. The demo lookups and `POST /requests` are implemented; remaining routes follow in later authorized steps. All IDs are UUIDs; timestamps are UTC ISO 8601; discounts are positive integer basis points. Request bodies reject unknown fields. Reasons contain 1–2,000 nonblank characters. These limits are technical validation, not bank policy.
 
 ## Identity and access
 
@@ -26,4 +26,4 @@ A new key for an application with a logical request yields 409; revisions must u
 
 Errors use the existing `{error:{code,message},correlation_id}` envelope and `X-Correlation-ID` response header. Validation is 422 `validation_error` (or `invalid_terms`/`invalid_idempotency_key` where business validation applies); missing application/request is 404; identity failures are 401/403; stale versions, an already decided version, existing request, and changed-input idempotency are 409 with distinct codes. Unavailable storage is 503 `database_unavailable`. The no-current-approval result above is a successful lookup, distinct from a nonexistent application's 404.
 
-The existing request boundary records safe method, route, status, outcome, duration, and correlation ID. Business write events will add actor/request/version identifiers and outcome when those routes are implemented. Reasons, raw bodies, keys, and personal data are excluded from operational logs. OpenAPI for each implemented route must show its schemas and error outcomes; examples for later routes arrive with their implementation.
+The existing request boundary records safe method, route, status, outcome, duration, and correlation ID. Creation events record actor/request/version identifiers and whether the call created or replayed the result; later write routes will do the same. Reasons, raw bodies, keys, and personal data are excluded from operational logs. OpenAPI for each implemented route shows its schemas and error outcomes; examples for later routes arrive with their implementation.
