@@ -87,6 +87,36 @@ def test_bootstrap_empty_state_and_session_ai_toggle(monkeypatch) -> None:
     assert any("Phase 06" in item.value for item in result.sidebar.caption)
 
 
+def test_rerun_filter_and_ai_toggle_do_not_write(monkeypatch) -> None:
+    fake = FakeApiClient()
+    monkeypatch.setattr(ui_client, "configured_client", lambda settings: fake)
+    monkeypatch.setattr("mortgage_pricing.config.get_settings", lambda: Settings())
+    result = AppTest.from_file(str(APP_PATH)).run()
+    next(item for item in result.sidebar.toggle if item.label == "Use AI assistance").set_value(
+        True
+    ).run()
+    next(item for item in result.selectbox if item.label == "Application filter").select(
+        "APP-001"
+    ).run()
+    next(item for item in result.selectbox if item.label == "Status filter").select("Pending").run()
+    assert result.session_state["use_ai_assistance"] is True
+    assert fake.posts == []
+
+
+def test_two_apptest_sessions_keep_ai_choice_separate(monkeypatch) -> None:
+    fake = FakeApiClient()
+    monkeypatch.setattr(ui_client, "configured_client", lambda settings: fake)
+    monkeypatch.setattr("mortgage_pricing.config.get_settings", lambda: Settings())
+    first = AppTest.from_file(str(APP_PATH)).run()
+    next(item for item in first.sidebar.toggle if item.label == "Use AI assistance").set_value(
+        True
+    ).run()
+    second = AppTest.from_file(str(APP_PATH)).run()
+    assert first.session_state["use_ai_assistance"] is True
+    assert second.session_state["use_ai_assistance"] is False
+    assert fake.posts == []
+
+
 def test_role_aware_navigation_switches_user_without_writes(monkeypatch) -> None:
     fake = FakeApiClient()
     monkeypatch.setattr(ui_client, "configured_client", lambda settings: fake)
@@ -179,6 +209,10 @@ def test_create_retry_reuses_key_and_exact_payload(monkeypatch) -> None:
     assert len(fake.posts) == 2
     assert fake.posts[1][3] == fake.posts[0][3]
     assert fake.posts[1][4]["Idempotency-Key"] == first_key
+    assert (
+        next(item for item in result.text_area if item.label == "Reason (1–2,000 characters)").value
+        == "Customer offer"
+    )
 
 
 def test_revision_is_explicit_and_uses_opened_version(monkeypatch) -> None:
@@ -265,6 +299,10 @@ def test_stale_decision_shows_refresh_without_reposting(monkeypatch) -> None:
     next(item for item in result.button if item.label == "Decline version 3").click().run()
     assert any("changed after opening" in item.value for item in result.error)
     assert any(item.label == "Refresh request" for item in result.button)
+    assert len(fake.posts) == 1
+    before_refresh = len(fake.calls)
+    next(item for item in result.button if item.label == "Refresh request").click().run()
+    assert len(fake.calls) > before_refresh
     assert len(fake.posts) == 1
 
 
