@@ -1,5 +1,6 @@
 """FastAPI application factory, process liveness, and database readiness."""
 
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
@@ -36,22 +37,41 @@ class ReadinessResponse(BaseModel):
 
 
 SCHEMA_REVISION = "20261029_0002"
-UI_DIRECTORY = Path(__file__).resolve().parents[2] / "ui"
+APPLICATION_ROOT = Path(
+    os.environ.get("MORTGAGE_PRICING_ROOT", Path(__file__).resolve().parents[2])
+)
+UI_DIRECTORY = APPLICATION_ROOT / "ui"
 
 
 def database_ready(app: FastAPI) -> bool:
-    """Check the migrated SQLite database without creating an absent file."""
+    """Check migrated SQLite storage and prove that a write transaction can start."""
     url = make_url(app.state.settings.database_url)
     if url.drivername != "sqlite":
         return False
-    if url.database != ":memory:" and not Path(url.database).is_file():
+    database = url.database
+    if database != ":memory:" and database is not None:
+        database_path = Path(database.removeprefix("file:"))
+        if not database_path.is_file():
+            return False
+    if app.state.database_engine is None:
         return False
     try:
         with app.state.database_engine.connect() as connection:
             revision = connection.execute(
                 text("SELECT version_num FROM alembic_version")
             ).scalar_one_or_none()
-            return revision == SCHEMA_REVISION
+            if revision != SCHEMA_REVISION:
+                connection.rollback()
+                return False
+            connection.execute(
+                text(
+                    "UPDATE alembic_version SET version_num = version_num "
+                    "WHERE version_num = :revision"
+                ),
+                {"revision": SCHEMA_REVISION},
+            )
+            connection.rollback()
+            return True
     except SQLAlchemyError:
         return False
 

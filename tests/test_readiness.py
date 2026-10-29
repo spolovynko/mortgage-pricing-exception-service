@@ -39,3 +39,16 @@ def test_migrated_database_is_ready_and_unmigrated_database_is_not(tmp_path: Pat
     ) as client:
         assert client.get("/ready").status_code == 503
         assert client.get("/health").status_code == 200
+
+
+def test_read_only_database_is_not_ready(tmp_path: Path) -> None:
+    path = tmp_path / "read-only.db"
+    writable_settings = Settings(_env_file=None, database_url=f"sqlite:///{path.as_posix()}")
+    config = Config(str(ROOT / "alembic.ini"))
+    config.attributes["settings"] = writable_settings
+    command.upgrade(config, "head")
+
+    read_only_url = f"sqlite:///file:{path.as_posix()}?mode=ro&uri=true"
+    with TestClient(create_app(Settings(_env_file=None, database_url=read_only_url))) as client:
+        assert client.get("/ready").status_code == 503
+        assert client.get("/health").status_code == 200
