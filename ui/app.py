@@ -220,6 +220,17 @@ def _render_requests(
         title="Current submitted terms",
         reason_key=f"request_reason_{detail['request_id']}_{detail['current_version_number']}",
     )
+    pricing = _api_call(
+        client, "get", f"/applications/{detail['application_id']}/approved-discount", login
+    )
+    st.subheader("Current approved pricing")
+    if pricing["status"] == "approved":
+        st.write(
+            f"{pricing['discount_bps']} bps · version {pricing['version_number']} "
+            f"of request {pricing['request_id']}"
+        )
+    else:
+        st.write("No current approved discount.")
     if is_manager:
         _render_revision(client, login, detail)
 
@@ -241,7 +252,39 @@ def _render_review(client: Any, login: str, rows: list[dict[str, Any]]) -> None:
         title="Terms for review",
         reason_key=f"review_reason_{detail['request_id']}_{detail['current_version_number']}",
     )
-    st.caption("Decision controls will be available in the next UI step.")
+    version = detail["current_version"]
+    if version["submitted_by_login"] == login:
+        st.info("You submitted this request and cannot review it.")
+        return
+    with st.form(f"decision_{detail['request_id']}_{version['version_number']}"):
+        approve = st.form_submit_button(f"Approve version {version['version_number']}")
+        decline = st.form_submit_button(f"Decline version {version['version_number']}")
+    outcome = "approved" if approve else "declined" if decline else None
+    if outcome:
+        try:
+            result = _post(
+                client,
+                f"/requests/{detail['request_id']}/decisions",
+                login,
+                {"expected_version": version["version_number"], "outcome": outcome},
+            )
+        except ApiError as exc:
+            if exc.code == "stale_version":
+                st.error(
+                    "This request changed after opening. Refresh and review the current version."
+                )
+                if st.button("Refresh request", key=f"refresh_review_{detail['request_id']}"):
+                    st.session_state["review_refresh_request"] = detail["request_id"]
+                    st.rerun()
+            else:
+                st.error(exc.message)
+                st.info("No automatic retry was made. Refresh to check the current decision.")
+            with st.expander("Technical details"):
+                st.text(
+                    f"Error code: {exc.code}\nCorrelation ID: {exc.correlation_id or 'Unavailable'}"
+                )
+            return
+        st.success(f"Version {result['version_number']} {result['outcome']}.")
 
 
 def _render_history(client: Any, login: str, rows: list[dict[str, Any]]) -> None:
@@ -256,8 +299,14 @@ def _render_history(client: Any, login: str, rows: list[dict[str, Any]]) -> None
         st.info("No history events are recorded for this request.")
         return
     for index, event in enumerate(events):
+        event_label = event["event_type"].title()
+        if (
+            event["event_type"] == "approved"
+            and event["version_number"] < labels[selected]["current_version_number"]
+        ):
+            event_label = "Earlier approval (historical)"
         st.write(
-            f"{event['event_type'].title()} · version {event['version_number']} · "
+            f"{event_label} · version {event['version_number']} · "
             f"{event['actor_login']} · {_format_time(event['occurred_at'])}"
         )
         with st.expander(f"View version {event['version_number']} terms · {event['event_type']}"):

@@ -21,6 +21,7 @@ class FakeApiClient:
         self.history = []
         self.posts = []
         self.fail_post_once = False
+        self.fail_decision_code = None
 
     def get(self, path: str, *, login: str, params=None):
         self.calls.append((path, login, str(params)))
@@ -51,6 +52,8 @@ class FakeApiClient:
             return self.detail
         if path == "/requests/request-1/history":
             return self.history
+        if path == "/applications/app-1/approved-discount":
+            return {"application_id": "app-1", "status": "none"}
         raise AssertionError(f"Unexpected API read: {path}")
 
     def request(self, method: str, path: str, *, login: str, json, **kwargs):
@@ -60,7 +63,16 @@ class FakeApiClient:
             from ui.client import ApiError
 
             raise ApiError(None, "backend_unavailable", "Timed out", "corr-timeout")
-        return {"request_id": "created-1", "version_number": 1, "replayed": False}
+        if path.endswith("/decisions") and self.fail_decision_code:
+            from ui.client import ApiError
+
+            raise ApiError(409, self.fail_decision_code, "Request changed", "corr-stale")
+        return {
+            "request_id": "created-1",
+            "version_number": json.get("expected_version", 1),
+            "outcome": json.get("outcome"),
+            "replayed": False,
+        }
 
 
 def test_bootstrap_empty_state_and_session_ai_toggle(monkeypatch) -> None:
@@ -211,3 +223,72 @@ def test_revision_is_explicit_and_uses_opened_version(monkeypatch) -> None:
         {"expected_version": 1, "discount_bps": 40, "reason": "Updated offer"},
         {},
     )
+
+
+def test_decision_submits_version_actually_opened(monkeypatch) -> None:
+    fake = _review_fake()
+    monkeypatch.setattr(ui_client, "configured_client", lambda settings: fake)
+    monkeypatch.setattr("mortgage_pricing.config.get_settings", lambda: Settings())
+    result = AppTest.from_file(str(APP_PATH)).run()
+    result = (
+        next(item for item in result.sidebar.selectbox if item.label == "Demo user")
+        .select("Sam Reviewer (sam.reviewer)")
+        .run()
+    )
+    next(item for item in result.sidebar.radio if item.label == "Navigate").set_value(
+        "Review"
+    ).run()
+    assert not result.exception
+    assert any(item.label == "Approve version 3" for item in result.button)
+    next(item for item in result.button if item.label == "Approve version 3").click().run()
+    assert fake.posts[-1][1] == "/requests/request-1/decisions"
+    assert fake.posts[-1][2] == "sam.reviewer"
+    assert fake.posts[-1][3] == {"expected_version": 3, "outcome": "approved"}
+
+
+def test_stale_decision_shows_refresh_without_reposting(monkeypatch) -> None:
+    fake = _review_fake()
+    fake.fail_decision_code = "stale_version"
+    monkeypatch.setattr(ui_client, "configured_client", lambda settings: fake)
+    monkeypatch.setattr("mortgage_pricing.config.get_settings", lambda: Settings())
+    result = AppTest.from_file(str(APP_PATH)).run()
+    result = (
+        next(item for item in result.sidebar.selectbox if item.label == "Demo user")
+        .select("Sam Reviewer (sam.reviewer)")
+        .run()
+    )
+    result = (
+        next(item for item in result.sidebar.radio if item.label == "Navigate")
+        .set_value("Review")
+        .run()
+    )
+    next(item for item in result.button if item.label == "Decline version 3").click().run()
+    assert any("changed after opening" in item.value for item in result.error)
+    assert any(item.label == "Refresh request" for item in result.button)
+    assert len(fake.posts) == 1
+
+
+def _review_fake() -> FakeApiClient:
+    fake = FakeApiClient()
+    fake.requests = [
+        {
+            "request_id": "request-1",
+            "application_id": "app-1",
+            "application_reference": "APP-001",
+            "current_version_number": 3,
+            "status": "pending",
+        }
+    ]
+    fake.detail = {
+        **fake.requests[0],
+        "current_version": {
+            "version_number": 3,
+            "status": "pending",
+            "discount_bps": 40,
+            "reason": "Revised terms",
+            "submitted_by_login": "ada.manager",
+            "submitted_at": "2026-10-29T12:00:00Z",
+            "decision": None,
+        },
+    }
+    return fake
