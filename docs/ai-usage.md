@@ -35,3 +35,12 @@ Record the actual runtime image/version, model name and digest, quantisation, pr
 Keep the live review assistant and offline LLM judge distinct. Define what the judge grades and compare it with human-labelled cases. Report false passes, unsupported statements, repeated-run variability, and latency. Label synthetic data, fakes, fixtures, and live outputs accurately.
 
 If the model cannot be downloaded or tested, record that limitation. Do not substitute invented scores, claim a fixture is live inference, or mark the live-model criteria complete.
+
+## 2026-10-29 - Phase 01, Step 2: Python project setup
+
+- Task and scope: user authorised Step 2 only. Read current repository instructions, phase/status/engineering documents, relevant requirements/architecture, and existing records; inspected clean Git state and installed interpreters/uv.
+- Contribution/tools: assistant created Python 3.12 metadata, an importable source package, uv lockfile, and setup/status/decision records; used PowerShell, Git, uv, isolated Python imports, and official Python/uv documentation. No subagents or product-model calls were used.
+- Observed checks: fresh `uv sync --locked` installed 17 packages in `.venv`; lock consistency, installed dependency consistency, isolated package/runtime imports, Python version/venv assertions, and ignored-output checks passed. Transient uv cache warnings during concurrent checks were absent on sequential reruns. See [build log](build-log.md) for exact commands and final record checks.
+- Human review: implementation authorisation was provided; review/acceptance of the resulting code and documents is not recorded. All output inspection described here was by the assistant.
+- Limits: no application behavior tests or lint checks were configured/run; only packaging/import compatibility was checked, on Windows/CPython 3.12.12. Phase 01 remains incomplete. No active work duration, production suitability, or model quality is claimed.
+- Related records: [ADR 0001](adr/0001-foundation-config-logging.md), [phase guide](phases/phase-01-foundation-config-logging.md), [project status](project-status.md). Next step is development-check configuration; no commit or push made.

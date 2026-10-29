@@ -1,6 +1,8 @@
 # Proposed architecture
 
-Status: Design baseline only. Update this document to describe implemented behaviour as phases complete. Use ADRs for the rationale behind decisions.
+Status: Project packaging implemented; application architecture remains a design baseline. Update this document as phases complete. Use ADRs for the rationale behind decisions.
+
+Step 2 progress (2026-10-29): the installable `src/mortgage_pricing` package and Python 3.12/uv dependency setup now exist, verified by installation and isolated imports. Only `__init__.py` exists in the package. The components, executable modules, and behavior below remain planned. See [ADR 0001](adr/0001-foundation-config-logging.md).
 
 ## Components and boundaries
 

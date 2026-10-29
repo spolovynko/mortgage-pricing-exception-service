@@ -4,15 +4,41 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 ## Current state
 
-This repository currently contains the documentation scaffold. The application, tests, Dockerfile, Compose configuration, and model setup have **not** been implemented. No application or model tests have been run as part of creating this scaffold.
+Phase 01 is in progress. Step 2 supplies an installable `mortgage_pricing` package, an isolated Python environment, and locked runtime dependencies. The API, configuration, logging, tests, UI, Dockerfile, Compose configuration, and model setup have **not** been implemented. Installation/import checks have passed; no application or model tests have run.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
+
+## Local project setup (Step 2)
+
+Use Python 3.12 and uv 0.11.6. From the repository root in PowerShell:
+
+```powershell
+# Bootstrap uv only if it is not already installed.
+py -3.12 -m pip install uv==0.11.6
+uv sync --locked
+```
+
+`.python-version` selects the 3.12 series; `requires-python` restricts this project to that series. The verified environment uses CPython 3.12.12 on Windows. Installation needs package-index access or a populated local cache; uv can obtain Python if the selected series is missing. No paid API, model, database, or Docker is required for this step.
+
+`uv sync --locked` creates `.venv` and installs the package in editable mode. Changes under `src/mortgage_pricing` are then available without reinstalling it. `pyproject.toml` declares dependencies and `uv.lock` records exact resolved versions and hashes. The existing .gitignore excludes `.venv` and Python bytecode; the lockfile belongs in Git.
+
+Verify after installation:
+
+```powershell
+uv lock --check
+uv pip check
+uv run --locked python -I -c "import mortgage_pricing, fastapi, pydantic_settings, uvicorn; print(mortgage_pricing.__file__)"
+```
+
+No activation is required. Python's `-I` mode excludes the current directory and `PYTHONPATH`, so the import checks the installed package. The only package source is currently `src/mortgage_pricing/__init__.py`; no server command exists yet. Runtime dependencies are FastAPI, Uvicorn, and Pydantic Settings. Test/lint tools and configuration are reserved for Step 3.
+
+For deliberate dependency changes, use `uv add <package>` and review both dependency files. Normal setup uses `--locked` so stale metadata fails rather than silently updating the lock. See [ADR 0001](docs/adr/0001-foundation-config-logging.md) for rationale and verification limits.
 
 ## Start here
 
 1. Read [project status](docs/project-status.md).
 2. Read [requirements](docs/requirements.md) and the [implementation plan](docs/implementation-plan.md).
-3. Start a new chat for [Phase 01](docs/phases/phase-01-foundation-config-logging.md).
+3. Continue [Phase 01](docs/phases/phase-01-foundation-config-logging.md) one agreed step at a time. Step 3 (development checks) is next.
 4. Have the agent read [AGENTS.md](AGENTS.md) before implementing that phase.
 
 Suggested phase-chat prompt:

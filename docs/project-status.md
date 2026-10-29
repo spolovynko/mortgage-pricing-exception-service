@@ -1,24 +1,25 @@
 # Project status
 
-Last updated: 2026-10-28
+Last updated: 2026-10-29
 
 ## Current position
 
-- Repository state: documentation scaffold only.
+- Repository state: Phase 01 in progress; Step 2 Python project setup is implemented and verified.
 - Scaffold placement: documents are present in the active Git working folder; the existing repository title and .gitignore were preserved. No implementation commit was created by the placement task.
-- Current implementation phase: not started.
-- Next phase: [Phase 01 - Foundation, configuration, logging](phases/phase-01-foundation-config-logging.md).
-- Application/API/UI/Docker/model implementation: not present.
+- Current implementation phase: [Phase 01 - Foundation, configuration, logging](phases/phase-01-foundation-config-logging.md), proceeding one user-requested step at a time. Step 1 inspection and Step 2 project setup are complete.
+- Next action: Step 3 - configure development checks. Do not continue automatically.
+- Project setup: Python 3.12 series, uv 0.11.6, `pyproject.toml` + `uv.lock`, `src/mortgage_pricing/__init__.py`, and ignored `.venv`. Fresh installation, isolated imports, lock consistency, and dependency consistency passed on Windows/CPython 3.12.12.
+- API, settings, logging, tests, UI, Docker, and model implementation: not present; only the installable package skeleton exists.
 - Application test and live-model evaluation results: not available.
 - Active work time: not recorded; do not infer it from conversation dates.
 
-Documentation scaffold verification on 2026-10-28: 21 Markdown files and 105 relative links passed a static completeness/link/fence check. All eight phase guides remain Not started. This result does not validate application or model behaviour; see the build log for its scope.
+Documentation scaffold verification on 2026-10-28: 21 Markdown files and 105 relative links passed a static completeness/link/fence check. At that time all eight phase guides were Not started. This historical result does not validate application or model behaviour; see the build log for its scope.
 
 ## Phase tracker
 
 | Phase | Status | ADR | Handoff |
 | --- | --- | --- | --- |
-| 01 | Not started | To be written | To be written |
+| 01 | In progress | [ADR 0001](adr/0001-foundation-config-logging.md) (Step 2 only) | At phase completion |
 | 02 | Not started | To be written | To be written |
 | 03 | Not started | To be written | To be written |
 | 04 | Not started | To be written | To be written |
@@ -43,7 +44,7 @@ Allowed phase states: Not started, In progress, Complete, or Incomplete - needs 
 
 - Exact API contracts and validation limits: settle in Phase 01/03 ADRs.
 - Database constraints and competing-update strategy: verify in Phase 02/03.
-- Dependency resolver/lock workflow and baseline Python version: settle in Phase 01.
+- Settled in Step 2: Python 3.12 series and uv with one project lockfile; see ADR 0001. Dependency imports/install verified; application compatibility still requires later tests.
 - Exact tested Ollama image, model digest, hardware footprint, and latency: establish in Phase 06.
 - AI quality criteria and observed judge agreement: establish in Phase 06/07; no accuracy claim yet.
 
@@ -51,4 +52,4 @@ The proposed business policy is in [requirements.md](requirements.md). Record an
 
 ## Next chat
 
-Implement Phase 01 using its guide and AGENTS.md. Creating this scaffold does not authorise implementing all phases in one chat.
+Continue Phase 01 with Step 3 only when requested. Read the guide, ADR 0001, and current Git state first. Phase completion records/handoff are still pending; Phase 02 has not started. No implementation commit or push has been made.

@@ -1,6 +1,6 @@
 # Phase 01 - Foundation, configuration, and logging
 
-- Status: Not started.
+- Status: In progress (Step 2 project setup verified; phase incomplete).
 - Milestone: MVP1.
 - Prerequisite: documentation scaffold; inspect actual repository state.
 - Primary ADR to create: `docs/adr/0001-foundation-config-logging.md`.
@@ -20,9 +20,9 @@ Establish the installable `mortgage_pricing` package under src/, tests/, UI entr
 
 ## Implementation tasks
 
-- [ ] Inspect existing changes and prerequisites; do not overwrite user work.
+- [x] Inspect existing changes and prerequisites; do not overwrite user work.
 - [ ] Translate any remaining scope ambiguity into explicit ADR assumptions, preserving the proposed requirements unless a material change is authorised.
-- [ ] Create project metadata, dependency/lock configuration, .gitignore, and documented local installation steps.
+- [x] Create project metadata, dependency/lock configuration, .gitignore, and documented local installation steps. Existing .gitignore already covers the virtual environment and bytecode and was preserved.
 - [ ] Create the minimal API application with an application factory or equivalent testable setup and a process health endpoint.
 - [ ] Add central Pydantic Settings and .env.example. Cover application environment, log level, database URL, demo identity mode, UI API address, and reserved AI settings.
 - [ ] Define `LLM_MODE=off|auto`: auto permits later capability discovery, not automatic inference. No live AI is needed in this phase.
@@ -33,6 +33,12 @@ Establish the installable `mortgage_pricing` package under src/, tests/, UI entr
 - [ ] Establish formatting/lint and test commands; document dependency installation before showing runnable commands.
 
 ## Verification
+
+### Incremental progress - 2026-10-29
+
+The user requested one agreed step at a time. Step 1 inspected the baseline. Step 2 now supplies Python 3.12 metadata, a `src/mortgage_pricing` package, uv locking, and an isolated installation. `uv sync --locked`, `uv lock --check`, `uv pip check`, and isolated package/runtime imports passed on Windows/CPython 3.12.12. See [ADR 0001](../adr/0001-foundation-config-logging.md) and [README](../../README.md) for rationale and commands.
+
+Next is Step 3: configure development checks. No API, settings implementation, logging, error handling, tests, or lint configuration has been created. All phase acceptance criteria below remain unchecked; installation alone does not complete the runnable-API criterion. The phase handoff will be written at phase completion.
 
 Test settings defaults, environment overrides, invalid values, isolated test settings, health responses, correlation propagation, and safe error/log behaviour. Tests must not require a real database, Docker, an external network, or a model.
 
