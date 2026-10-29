@@ -1,10 +1,10 @@
 # Phase 02 - Database and seed data
 
-- Status: In progress; execution Steps 1-11 complete. Step 12 requires the user's instruction.
+- Status: Complete; all execution steps and acceptance checks are evidenced.
 - Milestone: MVP1.
 - Prerequisite: Phase 01 complete or its unmet criteria explicitly resolved.
-- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 11 only.
-- Handoff to create: `docs/handoffs/phase-02.md`.
+- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented.
+- Handoff: [Phase 02 handoff](../handoffs/phase-02.md).
 
 ## Objective
 
@@ -20,7 +20,7 @@ Use SQLAlchemy with SQLite and Alembic migrations. Expected locations are `src/m
 
 ## User-gated execution steps
 
-Complete one step at a time. Record its checks, then wait for the user's instruction.
+Complete one step at a time. Report its checks in chat, then wait for the user's instruction. Consolidate repository records at phase completion under [AGENTS.md](../../AGENTS.md).
 
 1. [x] Confirm the Phase 01 baseline and persistence boundaries.
 2. [x] Add the persistence foundation.
@@ -33,7 +33,7 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 9. [x] Create and verify the initial Alembic migration.
 10. [x] Add repeatable synthetic seed data.
 11. [x] Add database readiness without changing process liveness.
-12. [ ] Run final verification and complete Phase 02 records and handoff.
+12. [x] Run final verification and complete Phase 02 records and handoff.
 
 ### Step 1 evidence - 2026-10-29
 
@@ -125,6 +125,13 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - The app owns a lazy database engine and disposes it during lifespan shutdown. The readiness probe does not create an absent database. Two isolated API tests cover migrated, unmigrated, and missing storage, as well as liveness during storage failure. Focused **2 passed**; full suite **120 passed**. Final static checks are in the build log.
 - Phase 02 acceptance and handoff remain Step 12 work. No normal database was opened or reset. Step 12 requires the user's instruction.
 
+### Step 12 evidence - 2026-10-29
+
+- Added one isolated end-to-end acceptance scenario. It applies the initial Alembic revision twice to a new pytest-owned file-backed SQLite database, runs seed data twice, closes and reopens the engine, verifies persisted user/application/request counts, and checks `GET /ready`.
+- `uv run --locked python -m pytest tests/test_phase_02_acceptance.py -q`: **1 passed**. `uv run --locked python -m pytest -q`: **121 passed**. `uv run --locked python -m ruff check .`, `uv run --locked python -m ruff format --check .` (**58 files**), `uv lock --check` (**33 packages**), `uv pip check` (**32 packages**), and `git diff --check` all passed.
+- Existing migration, seed, operation, and readiness cases supply the acceptance evidence for direct database foreign-key/uniqueness/immutability enforcement, failed atomic writes, repeatable seeding that preserves unrelated records, and safe unavailable-storage readiness behavior. All databases used by tests are temporary and isolated; no user database was opened, reset, or removed.
+- Phase 02 is complete based on implementation and observed checks. Human review/acceptance and active work time are not recorded. Phase 03 is next but has not been started.
+
 ## Implementation tasks
 
 - [x] Define users/role membership and mortgage applications with a documented manager-ownership relationship.
@@ -135,9 +142,9 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - [x] Establish explicit session/transaction lifetime and SQLite foreign-key/transaction configuration. Document limitations and lock handling.
 - [x] Create and verify the initial Alembic migration. Do not rely on wiping the database to evolve the schema.
 - [x] Add repeatable seed data: at least two managers, two reviewers, and three clearly fictional applications. Reserve a clean application for the create/approve demo.
-- [ ] Optionally include clearly fictional approved/declined examples, with coherent historical versions/events rather than fabricated live decisions.
+- [x] Intentionally omit fictional approved/declined examples so `SYN-MORTGAGE-DEMO-CLEAN` remains available for the later end-to-end workflow demonstration.
 - [x] Add database access to core readiness; keep process liveness separate and avoid optional AI dependencies.
-- [ ] Add seed/migration operational logs without sensitive record dumps.
+- [x] Add seed/migration operational logs without sensitive record dumps.
 
 ## Verification
 
@@ -147,15 +154,15 @@ Use a test database per test or isolated test group. Never run destructive persi
 
 ## Acceptance criteria
 
-- [ ] A fresh database is created through migrations, and a second migration/setup run is safe.
-- [ ] Seed execution is repeatable and preserves existing work.
-- [ ] Relationships and critical uniqueness rules are enforced by the database.
-- [ ] Decision/history data supports the exact-version requirements without editing earlier submitted terms.
-- [ ] Persistence and transaction tests pass against file-backed SQLite.
-- [ ] The API reports database readiness accurately and fails safely when storage is unavailable.
+- [x] A fresh database is created through migrations, and a second migration/setup run is safe.
+- [x] Seed execution is repeatable and preserves existing work.
+- [x] Relationships and critical uniqueness rules are enforced by the database.
+- [x] Decision/history data supports the exact-version requirements without editing earlier submitted terms.
+- [x] Persistence and transaction tests pass against file-backed SQLite.
+- [x] The API reports database readiness accurately and fails safely when storage is unavailable.
 
 ## Decision record and handover
 
-Explain schema relationships, the one-logical-request policy, history preservation, SQLite configuration, transaction boundaries, and the seed strategy. Record exact migration/seed commands and known limitations. Update the ADR index, this guide, [build log](../build-log.md), [AI usage](../ai-usage.md), and [project status](../project-status.md); create the handoff using [the template](../handoffs/template.md).
+Explain schema relationships, the one-logical-request policy, history preservation, SQLite configuration, transaction boundaries, and the seed strategy. Record exact migration/seed commands and known limitations. Update the ADR index, this guide, [build log](../build-log.md), [AI usage](../ai-usage.md), and [project status](../project-status.md); create the handoff using [AGENTS.md](../../AGENTS.md).
 
 Stop after Phase 02. The next phase implements business operations and their HTTP contracts.

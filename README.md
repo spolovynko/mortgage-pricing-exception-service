@@ -6,7 +6,7 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 Phase 01 is complete: installable Python package, locked development tools, validated configuration, health API, structured request logging, and safe correlated error responses. Its fresh-install verification passed on Windows/CPython 3.12.12 with **48 tests passing**. See the [Phase 01 handoff](docs/handoffs/phase-01.md).
 
-Phase 02 Steps 1-11 are complete. SQLite persistence, migration, seed data, and database readiness are available; **120 tests pass** in the workspace. `/health` reports process liveness and `/ready` checks migrated database storage. See the [Phase 02 guide](docs/phases/phase-02-database-and-seed-data.md) and [ADR 0002](docs/adr/0002-database-and-seed-data.md). Business endpoints, UI, containers, and model integration remain later-phase work.
+Phase 02 is complete. SQLite persistence, migration, repeatable synthetic seed data, atomic operations, and database readiness are available; **121 tests pass** in the workspace. `/health` reports process liveness and `/ready` checks migrated database storage. See the [Phase 02 guide](docs/phases/phase-02-database-and-seed-data.md), [ADR 0002](docs/adr/0002-database-and-seed-data.md), and [handoff](docs/handoffs/phase-02.md). Business endpoints, UI, containers, and model integration remain later-phase work.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -95,19 +95,21 @@ Unexpected exceptions before response start receive HTTP 500:
 
 The same ID appears in `X-Correlation-ID` and the failure log. The request boundary logs the diagnostic once and sends the safe response. HTTP exceptions with 5xx status also receive a generic internal-error message. Already-started streams/background failures cannot replace a response; they are logged and rethrown. Run `uv run --locked python -m pytest tests/test_errors.py` to verify the error contract.
 
-## Persistence foundation (Phase 02, Steps 2-11)
+## Persistence foundation (Phase 02)
 
 `persistence/base.py` defines shared metadata with stable constraint names. `persistence/database.py` provides `create_database_engine(settings)` and `create_session_factory(engine)` without import-time or construction-time I/O. The caller closes sessions/connections and then disposes the engine. Use `with factory.begin() as session` for basic commit/rollback/closure; a plain session context never commits implicitly. Each operation owns its session. SQL echo is off and bound parameter values are hidden in exception text.
 
-SQLite connections use Python 3.12+ `autocommit=False` and enforce foreign keys. The configured busy timeout bounds waits for a competing writer; callers must handle lock errors. Users have unique logins and role memberships. Mortgage applications have unique references and an owner who must hold the relationship-manager role. A unique logical request per application contains numbered versions with positive basis-point discounts, bounded nonblank reasons, submitters, and UTC timestamps. The current pointer can only refer to a version of that request. ORM edits/deletes of versions are rejected; direct SQL protection is due in the Step 9 migration. The API does not yet create database resources; its storage lifecycle/readiness wiring is Step 11. No operational schema or seed command exists yet.
+SQLite connections use Python 3.12+ `autocommit=False` and enforce foreign keys. The configured busy timeout bounds waits for a competing writer; callers must handle lock errors. Users have unique logins and role memberships. Mortgage applications have unique references and an owner who must hold the relationship-manager role. A unique logical request per application contains numbered versions with positive basis-point discounts, bounded nonblank reasons, submitters, and UTC timestamps. The current pointer can only refer to a version of that request. ORM edits/deletes and migration triggers prevent direct SQL changes to immutable submitted terms, decisions, history, and retry mappings. The API owns a lazy engine for `/ready`; operational schema setup uses Alembic and repeatable baseline data uses the seed command.
 
 Decisions reference exact versions and require a reviewer-role user; only one decision can exist per version. Typed history events record version, actor, and UTC time. ORM edits/deletes of these records are rejected. Step 8 operations enforce self-review and current-version checks and commit decisions with history. Step 9 must protect stored rows from direct SQL updates/deletes.
 
 Creation idempotency records scope a key to a caller, store a SHA-256 fingerprint of canonical input, and point to the original request's version 1. Step 8 operations fingerprint deterministic JSON of exact input and replay the original reference for the same caller/key/input; changed input conflicts. Business rows, history, and the retry mapping commit together. Alembic revision `20261029_0001` creates this schema and SQLite triggers reject direct SQL changes to immutable versions, decisions, history events, and retry records.
 
-Run `uv run --locked python -m pytest tests/persistence` to verify the 67 persistence cases. These tests use temporary probe/business tables and apply migrations to temporary database files. No application code creates tables or directories. Apply operational schema changes with `uv run --locked python -m alembic upgrade head`. See [ADR 0002](docs/adr/0002-database-and-seed-data.md) for the resource contract and limitations.
+Run `uv run --locked python -m pytest tests/persistence` to verify the persistence cases, or `uv run --locked python -m pytest` for the complete **121-test** suite. These tests use temporary probe/business tables and apply migrations to temporary database files. No application code creates tables or directories. Apply operational schema changes with `uv run --locked python -m alembic upgrade head`. See [ADR 0002](docs/adr/0002-database-and-seed-data.md) for the resource contract and limitations.
 
 After migration, run `uv run --locked python -m mortgage_pricing.seed` to add four clearly fictional users and three fictional mortgage applications. It reserves `SYN-MORTGAGE-DEMO-CLEAN` for the future create/approve demonstration. Re-running the command is safe: it creates no duplicates and preserves unrelated existing records.
+
+Set `DATABASE_URL` to the intended SQLite file before migration, for example `$env:DATABASE_URL = "sqlite:///./data/mortgage_pricing.db"` in PowerShell. Ensure its parent directory exists. Tests inject temporary database settings through Alembic configuration attributes; operational setup must use migrations rather than `Base.metadata.create_all()`.
 
 `GET /ready` returns ready only when the configured SQLite database exists and has the current Alembic revision. Storage failure returns a correlated 503. `GET /health` stays available as process liveness.
 
@@ -115,16 +117,15 @@ After migration, run `uv run --locked python -m mortgage_pricing.seed` to add fo
 
 1. Read [project status](docs/project-status.md).
 2. Read [requirements](docs/requirements.md) and the [implementation plan](docs/implementation-plan.md).
-3. Read the [Phase 01 handoff](docs/handoffs/phase-01.md), [Phase 02 guide](docs/phases/phase-02-database-and-seed-data.md), and [ADR 0002](docs/adr/0002-database-and-seed-data.md). Step 12 is next, only when requested.
+3. Read the [Phase 02 handoff](docs/handoffs/phase-02.md), [Phase 03 guide](docs/phases/phase-03-business-rules-and-api.md), and [ADR 0002](docs/adr/0002-database-and-seed-data.md). Phase 03 is next, only when requested.
 4. Have the agent read [AGENTS.md](AGENTS.md) before implementing that phase.
 
 Suggested phase-chat prompt:
 
 ```text
-Implement Phase 02 execution Step 12 only. Read AGENTS.md, docs/project-status.md,
-the phase guide, ADR 0002, and their required references. Inspect Git/source state
-and preserve existing changes. Complete Step 12 checks and evidence records,
-then stop before Phase 03. Do not commit or push.
+Implement Phase 03 only. Read AGENTS.md, docs/project-status.md, the Phase 02
+handoff, the Phase 03 guide, relevant ADRs, and their required references. Inspect
+Git/source state and preserve existing changes. Do not commit or push.
 ```
 
 Change the phase number and guide for each subsequent chat. Use the same repository so the agent has access to its documentation and implementation.
@@ -141,7 +142,7 @@ Change the phase number and guide for each subsequent chat. Use the same reposit
 | [Architecture decisions](docs/adr/README.md) | Decision index and record-writing instructions |
 | [Build log](docs/build-log.md) | Chronological work and verification evidence |
 | [AI usage](docs/ai-usage.md) | AI contributions, review, corrections, and limitations |
-| [Handoff template](docs/handoffs/template.md) | Context for the next phase chat |
+| [Repository instructions](AGENTS.md) | Working defaults and phase handoff requirements |
 
 ## Planned stack
 

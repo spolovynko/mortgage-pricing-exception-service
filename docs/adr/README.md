@@ -1,10 +1,12 @@
 # Architecture decision records
 
-ADRs explain a consequential choice, its alternatives, and its trade-offs. Use the [template](template.md). Create at least one primary record per phase, plus additional records for distinct decisions that need their own explanation.
+ADRs explain a consequential choice, its alternatives, and its trade-offs. Create at least one primary record per phase, plus additional records for distinct decisions that need their own explanation.
+
+Keep each record concise: date, phase/milestone, status and implementation scope, contributor, actual human acceptance (or not recorded), related requirements, context, options, decision and rationale, consequences, rejected alternatives and revisit conditions, production follow-ups, and references/supersession. Link to observed verification evidence and its limits rather than copying test logs. Distinguish assignment requirements from exercise assumptions and unverified proposals from implemented behavior.
 
 ADR 0001 records the completed Phase 01 foundation and verification. Its status is Implemented; human acceptance is not recorded. Planning proposals for later phases remain in [requirements](../requirements.md) and [architecture](../architecture.md).
 
-ADR 0002 records the Phase 02 resource/configuration foundation, SQLite transaction behavior, business/idempotency models, atomic operations, initial migration, seed data, and readiness. It is Implemented through execution Step 11 only; final phase acceptance remains pending.
+ADR 0002 records the completed Phase 02 resource/configuration foundation, SQLite transaction behavior, business/idempotency models, atomic operations, initial migration, seed data, and readiness.
 
 ## Primary phase records
 
@@ -13,7 +15,7 @@ Reserve these names for the primary phase records. Create the file during the ph
 | Phase | Expected primary ADR | Current state |
 | --- | --- | --- |
 | 01 | [0001-foundation-config-logging.md](0001-foundation-config-logging.md) | Implemented; Phase 01 complete |
-| 02 | [0002-database-and-seed-data.md](0002-database-and-seed-data.md) | Implemented through Step 11 only; phase in progress |
+| 02 | [0002-database-and-seed-data.md](0002-database-and-seed-data.md) | Implemented; Phase 02 complete |
 | 03 | `0003-business-rules-and-api.md` | Not created |
 | 04 | `0004-user-interface.md` | Not created |
 | 05 | `0005-containerisation.md` | Not created |

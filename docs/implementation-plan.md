@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: Phase 01 complete. Phase 02 Steps 1-11 are complete; database readiness is verified and final acceptance/handover is next. See [project status](project-status.md).
+Status: Phases 01-02 are complete. Phase 03 is next and has not started. See [project status](project-status.md).
 
 This plan implements the requirements and the user's agreed additions: a Python UI, optional local AI, automatic model setup, operational logging, central configuration, and one application Dockerfile with one Compose file.
 
@@ -29,7 +29,7 @@ MVP2 and MVP3 are delivery labels for this exercise, not claims of production ma
 
 ## One chat per phase
 
-Start in this repository and ask the agent to implement a specific guide. The agent first proposes a short step/substep plan and a cost/performance model recommendation, then proceeds with the requested phase. It reads the current status, guide, previous handoff, and only relevant supporting sections. It performs the work and checks, then writes concise phase records as directed by AGENTS.md.
+Start in this repository and ask the agent to implement a specific guide. Reuse an agreed plan and selected model; otherwise establish a short phase plan. Read current status, the active guide, previous handoff, and only supporting sections needed for concrete questions. Follow the strict economy defaults in [AGENTS.md](../AGENTS.md): targeted reads, focused checks, brief replies, and consolidated phase-completion records.
 
 The authoritative current position is [project-status.md](project-status.md). The build log records chronology; ADRs preserve reasoning; handoffs provide concise continuation context. If code and documentation disagree, inspect the evidence and repair the documentation or implementation explicitly.
 

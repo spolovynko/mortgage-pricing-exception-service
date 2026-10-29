@@ -85,6 +85,6 @@ Use the actual supported commands. Expected forms after installation include `py
 
 ## Decision record and handover
 
-Explain the Python baseline, dependency workflow, configuration precedence, logging schema, identity shortcut, and any meaningful project-layout choices. Update this guide, the ADR index, [build log](../build-log.md), [AI usage](../ai-usage.md), and [project status](../project-status.md). Write the phase handoff with exact setup/check commands and remaining issues. Use [the handoff template](../handoffs/template.md).
+Explain the Python baseline, dependency workflow, configuration precedence, logging schema, identity shortcut, and any meaningful project-layout choices. Update this guide, the ADR index, [build log](../build-log.md), [AI usage](../ai-usage.md), and [project status](../project-status.md). Write the phase handoff with exact setup/check commands and remaining issues. Follow [AGENTS.md](../../AGENTS.md).
 
 Stop after Phase 01. The next phase creates database models, migrations, and seed data.

@@ -2,15 +2,15 @@
 
 - Date: 2026-10-29 (Europe/Brussels).
 - Phase / milestone: 02 / MVP1.
-- Status: Implemented through execution Step 11 only; Phase 02 remains in progress.
-- Implementation state: partial; SQLite configuration, storage models, atomic operations, initial migration, and seed data verified.
+- Status: Implemented; Phase 02 complete.
+- Implementation state: complete for Phase 02; SQLite configuration, storage models, atomic operations, initial migration, seed data, and readiness verified.
 - Decision owner or contributor: Codex assistant within the user's incremental Phase 02 requests.
 - Human acceptance: not recorded for the resulting implementation.
 - Related requirements and phase guide: NFR-01/03, DEL-02/03; [Phase 02](../phases/phase-02-database-and-seed-data.md).
 
 ## Context
 
-Step 1 verified the Phase 01 baseline. Step 2 began from clean `main` at `54e219e`, with the Step 1 records committed. The user authorized each later step separately. Steps 3-7 added SQLite transaction guarantees and business storage models; Step 8 added atomic operations; Step 9 added the initial migration; Step 10 adds seed data. API/database readiness wiring remains Step 11.
+Step 1 verified the Phase 01 baseline. Step 2 began from clean `main` at `54e219e`, with the Step 1 records committed. The user authorized each later step separately. Steps 3-7 added SQLite transaction guarantees and business storage models; Step 8 added atomic operations; Step 9 added the initial migration; Step 10 added seed data; Step 11 added API/database readiness; and Step 12 performed final isolated acceptance verification and records.
 
 The project already uses immutable central settings, explicit application factories, safe JSON diagnostics, and shared HTTP error handling. Persistence should fit those boundaries. The agreed stack is SQLite through SQLAlchemy, with Alembic for schema evolution.
 
@@ -45,17 +45,18 @@ The project already uses immutable central settings, explicit application factor
 - Step 9 configures Alembic to load validated `Settings` only when invoked, then applies explicit revision `20261029_0001`. It creates every Phase 02 table and database constraint without any startup schema creation. The initial revision adds SQLite `BEFORE UPDATE` and `BEFORE DELETE` triggers for submitted versions, decisions, history events, and retry mappings, extending ORM protection to direct SQL. The request/current-version foreign-key cycle uses `use_alter=True` in metadata so migration tooling can order it. SQLite reflection still produces false positive unique-constraint differences during `alembic check`; applied-schema tests verify this migration instead. Downgrade removes triggers before dropping the tables.
 - Step 10 uses fixed UUIDv5 identities and technical references for four clearly fictional users and three fictional applications. It reserves `SYN-MORTGAGE-DEMO-CLEAN` without a request, version, decision, or history so later work can demonstrate the complete creation and approval flow. The seed function opens a short transaction only after migration; it creates missing matching records, leaves unrelated rows untouched, and rejects identifier/content collisions rather than overwriting a local record. The command logs only a seed event and outcome. No artificial decisions are seeded.
 - Step 11 adds a separate `/ready` probe: it requires an existing SQLite file and the expected Alembic revision, then reports ready. Missing, inaccessible, or unmigrated storage yields a safe correlated 503. `/health` continues to report process liveness. The app creates a lazy engine and disposes it at shutdown; readiness does not initialize schema or optional AI.
+- Step 12 adds an end-to-end acceptance test that applies the migration twice, seeds twice, closes and reopens the engine, verifies the persisted baseline rows, and checks readiness against the same temporary file. Existing focused cases separately demonstrate database relationship/uniqueness enforcement, direct-SQL immutability, failed-operation rollback, and unavailable-storage behavior.
 - Add ignore rules for local `data/`, SQLite database files, and journal/WAL/shared-memory sidecars. No real settings, normal database, or existing data directory is opened or removed.
 
 ## Consequences
 
 The common persistence boundary is available for later steps without adding business models or unnecessary abstraction layers. Factories can be injected and tested against separate files. Storage failures reach the calling boundary with no fabricated success.
 
-**This is an incomplete business persistence foundation.** Core models, SQLite-specific atomic writes, the initial operational migration, and repeatable synthetic seed data are verified in temporary databases. API integration remains pending.
+**This is the completed Phase 02 persistence foundation.** Core models, SQLite-specific atomic writes, the initial operational migration, repeatable synthetic seed data, and readiness are verified in temporary databases. HTTP business contracts remain a Phase 03 responsibility.
 
 Step 3 configures Python 3.12+ sqlite3 with `autocommit=False`, rather than relying on the driver's legacy mode. An engine-local connection listener temporarily enables autocommit to run `PRAGMA foreign_keys=ON`, then restores the prior value. This applies to every pooled DBAPI connection before use and does not introduce import-time I/O. A short busy timeout still raises a lock error under contention; callers must end the failed transaction and choose whether a later retry is valid. Journal mode remains SQLite's default; no automatic retry or cross-process update protocol is claimed. Keep business write transactions short.
 
-File-backed tests establish FK rejection, transactional DDL/savepoints, bounded writer contention, business storage constraints, Step 8 operation atomicity, competing-write outcomes, the initial applied migration, and repeatable seed behavior. API integration remains pending.
+File-backed tests establish FK rejection, transactional DDL/savepoints, bounded writer contention, business storage constraints, operation atomicity, competing-write outcomes, the initial applied migration, repeatable seed behavior, restart persistence, and readiness. They do not claim production audit tamper resistance, cross-platform verification, or multi-instance operation.
 
 Only tests create a simple probe table in pytest-owned temporary files. Application code does not create a schema. Operational schema setup must use Alembic in Step 9. The absence of a data directory will produce a storage error on connection; no implicit filesystem setup occurs here.
 
@@ -64,6 +65,7 @@ Only tests create a simple probe table in pytest-owned temporary files. Applicat
 - `uv add "sqlalchemy>=2.0.55,<2.1" "alembic>=1.16,<2"` resolved 33 packages and installed Alembic 1.20.1, Mako 1.4.3, and MarkupSafe 3.0.4. SQLAlchemy 2.0.55 and greenlet 3.5.6 were already present in the ignored environment; this step adds them to the authoritative project metadata/lock.
 - `uv run --locked python -m pytest tests/persistence tests/test_config.py`: **33 passed**. Initial lint found one long assertion; formatting corrected it before final checks. No test failure or warning suppression occurred.
 - `uv run --locked python -m pytest`: **62 passed**, including 11 persistence-foundation cases and 22 configuration cases.
+- Final Phase 02 verification: `uv run --locked python -m pytest tests/test_phase_02_acceptance.py -q`: **1 passed**; `uv run --locked python -m pytest -q`: **121 passed**; Ruff lint/format, lock consistency, installed-dependency compatibility, and `git diff --check` passed. The acceptance scenario used only a pytest temporary file-backed database.
 - New cases verify imports outside the repository with deliberately invalid settings, lazy engine/session construction, missing-parent failure without directory creation, connection without schema creation, configured timeout, safe rejection of two reserved PostgreSQL URL forms, committed data after a new engine opens the same file, rollback/recovery, no implicit commit, separate database isolation, connection return on context exit, and hidden bound values in exception text.
 - `uv run --locked python -m ruff check .`: passed. `uv run --locked python -m ruff format --check .`: 39 files already formatted. `uv lock --check`: 33 packages. `uv pip check`: 32 installed packages compatible. `uv run --locked python -m alembic --version`: `alembic 1.20.1`.
 - Tests use Windows/CPython 3.12.12 and temporary file-backed SQLite. No migration, business schema, seed, database readiness, live API/storage integration, other-platform, or whole-phase acceptance result is claimed. Final dependency comparison and static checks are recorded in the [build log](../build-log.md).

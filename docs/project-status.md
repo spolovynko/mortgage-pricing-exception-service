@@ -4,12 +4,13 @@ Last updated: 2026-10-29
 
 ## Current position
 
-- Repository state: Phase 01 complete. Phase 02 is in progress with Steps 1-11 complete and final acceptance/handover pending.
+- Repository state: Phases 01 and 02 are complete. Phase 03 has not started.
 - Scaffold placement: documents are present in the active Git working folder; the existing repository title and .gitignore were preserved. No implementation commit was created by the placement task.
 - Completed implementation phase: [Phase 01 - Foundation, configuration, logging](phases/phase-01-foundation-config-logging.md), implemented in user-requested Steps 1-8. See [handoff](handoffs/phase-01.md).
-- Next action: [Phase 02 Step 12 - final verification and handover](phases/phase-02-database-and-seed-data.md), only after the user's instruction. Do not continue automatically.
+- Completed implementation phase: [Phase 02 - Database and seed data](phases/phase-02-database-and-seed-data.md). See [handoff](handoffs/phase-02.md).
+- Next action: [Phase 03 - Business rules and API](phases/phase-03-business-rules-and-api.md), only after the user's instruction. Do not continue automatically.
 - Project setup: Python 3.12 series, uv 0.11.6, `pyproject.toml` + `uv.lock`, `src/mortgage_pricing/__init__.py`, and ignored `.venv`. Fresh installation, isolated imports, lock consistency, and dependency consistency passed on Windows/CPython 3.12.12.
-- Development checks: Step 11 workspace suite passes 120 tests, including 67 persistence cases. Ruff lint/format and lock/dependency checks pass (33 locked/32 installed packages). Phase 01's historical fresh-environment and invalid external-settings runs covered its 48-test suite; those scenarios have not been rerun for Phase 02. Windows/CPython 3.12.12 only; tests isolate shell/dotenv settings and working directories.
+- Development checks: final Phase 02 workspace suite passes 121 tests, including an isolated migration/seed/restart/readiness acceptance scenario. Ruff lint/format and lock/dependency checks pass (33 locked/32 installed packages). Phase 01's historical fresh-environment and invalid external-settings runs covered its 48-test suite; those scenarios have not been rerun for Phase 02. Windows/CPython 3.12.12 only; tests isolate shell/dotenv settings and working directories.
 - Configuration: immutable Pydantic Settings and `.env.example` with validated modes, URLs, bounds, and documented precedence; configuration tests pass. It does not connect to a database or model.
 - Persistence foundation: SQLAlchemy 2.0.55, Alembic 1.20.1, shared metadata, lazy engine/session factories, and user/application/request/version/decision/history/idempotency models. Step 3 configures SQLite transactions and foreign keys; Steps 4-7 add core models; Step 8 adds atomic create/revise/decide functions; Step 9 adds Alembic revision `20261029_0001`; Step 10 adds repeatable fictional users/applications; Step 11 adds database readiness. See [ADR 0002](adr/0002-database-and-seed-data.md).
 - API: `create_app` factory, process liveness at `GET /health`, and database readiness at `GET /ready` are implemented. Readiness checks an existing SQLite file and current Alembic revision; missing/unmigrated storage returns a safe correlated 503.
@@ -24,7 +25,7 @@ Documentation scaffold verification on 2026-10-28: 21 Markdown files and 105 rel
 | Phase | Status | ADR | Handoff |
 | --- | --- | --- | --- |
 | 01 | Complete | [ADR 0001](adr/0001-foundation-config-logging.md), Implemented | [Phase 01](handoffs/phase-01.md) |
-| 02 | In progress; Steps 1-11 complete | [ADR 0002](adr/0002-database-and-seed-data.md), Implemented through Step 11 | Due at phase completion |
+| 02 | Complete | [ADR 0002](adr/0002-database-and-seed-data.md), Implemented | [Phase 02](handoffs/phase-02.md) |
 | 03 | Not started | To be written | To be written |
 | 04 | Not started | To be written | To be written |
 | 05 | Not started | To be written | To be written |
@@ -47,7 +48,7 @@ Allowed phase states: Not started, In progress, Complete, or Incomplete - needs 
 ## Decisions still needing implementation detail
 
 - Exact API contracts and validation limits: settle in Phase 01/03 ADRs.
-- Database constraints and competing-update strategy: verify in Phase 02/03.
+- HTTP mapping for database constraints and competing-update outcomes: settle in Phase 03.
 - Settled in Step 2: Python 3.12 series and uv with one project lockfile; see ADR 0001. Final fresh-environment installation and foundation tests pass.
 - Settled in Step 4: Pydantic Settings values precedence, accepted configuration modes, defaults, and inert AI/database connection settings; see ADR 0001. Settings construction tests pass.
 - Settled in Step 5: minimal FastAPI application factory and process-only `/health` contract. No readiness dependencies are probed.
@@ -61,4 +62,4 @@ The proposed business policy is in [requirements.md](requirements.md). Record an
 
 ## Next chat
 
-Continue Phase 02 at execution Step 12 only when requested. Step 11 began from clean `main` at `54acbdc`; its changes are uncommitted. Read ADR 0002 and the phase guide before final verification. Whole-phase acceptance and handoff remain pending. Human review/acceptance and active work time are not recorded. No assistant commit or push.
+Start Phase 03 only when requested. Read the Phase 02 handoff, ADR 0002, and the Phase 03 guide before changing code. Human review/acceptance and active work time are not recorded. No assistant commit or push.

@@ -8,9 +8,11 @@ from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from starlette.responses import JSONResponse
 
+from mortgage_pricing.api_foundation import DemoError, demo_error_handler
+from mortgage_pricing.api_foundation import router as demo_router
 from mortgage_pricing.config import Settings, get_settings
 from mortgage_pricing.errors import error_response, register_error_handlers
 from mortgage_pricing.logging_config import create_logger
@@ -69,6 +71,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.add_middleware(RequestLoggingMiddleware, logger=app.state.logger)
     register_error_handlers(app)
+    app.add_exception_handler(DemoError, demo_error_handler)
+
+    async def storage_error(request: Request, _exc: OperationalError) -> JSONResponse:
+        return error_response(
+            503, "database_unavailable", "Database is unavailable.", request.state.correlation_id
+        )
+
+    app.add_exception_handler(OperationalError, storage_error)
+    app.include_router(demo_router)
 
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     def health() -> HealthResponse:
