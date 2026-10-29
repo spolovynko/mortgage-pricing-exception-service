@@ -129,3 +129,10 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Contribution: authored exact-version decision and typed history ORM models, their constraints and ORM immutability guards, seven isolated file-backed tests, and ADR/progress/evidence changes. Used PowerShell, Git, uv, pytest, Ruff, and installed SQLAlchemy.
 - Actual verification: seven focused tests and 90 total tests passed; final Ruff lint/format and lock/dependency checks passed. One format finding was corrected. Exact commands and limits are in the build log.
 - Review/limits: assistant inspected code/results; no human review/acceptance or duration is recorded. Self-review, stale versions, and decision/history atomicity remain operation-level work. Direct SQL immutability awaits migration triggers. No normal database, commit, or push; Step 7 remains user-gated.
+
+## 2026-10-29 - Phase 02, Step 7: caller-scoped idempotency storage
+
+- Task/scope: user authorized Step 7 only. Assistant inspected clean `882bdfa`, current models and records. No subagents or product-model calls were used.
+- Contribution: authored the caller/key retry model with fingerprint and original result reference, ORM immutability guard, isolated file-backed tests, and related ADR/progress/evidence. Used PowerShell, Git, uv, pytest, Ruff, and installed SQLAlchemy.
+- Verification: final full suite **102 passed**; lock/dependency checks passed. Initial lint/format findings were corrected; final results are in the build log.
+- Review/limits: assistant reviewed code/results; human review/acceptance and duration are not recorded. Canonicalization, replay/conflict handling, atomic business writes, migration triggers, seeds, and readiness remain pending. No normal database, commit, or push. Step 8 is user-gated.

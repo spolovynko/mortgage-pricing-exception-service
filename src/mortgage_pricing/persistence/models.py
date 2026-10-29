@@ -276,6 +276,41 @@ class RequestHistoryEvent(Base):
     )
 
 
+class CreationIdempotencyRecord(Base):
+    """Caller-scoped creation key and immutable reference to its first result."""
+
+    __tablename__ = "creation_idempotency_records"
+    __table_args__ = (
+        CheckConstraint("length(trim(key)) BETWEEN 1 AND 128", name="key_length"),
+        CheckConstraint("version_number = 1", name="original_version_one"),
+        CheckConstraint(
+            "length(input_fingerprint) = 64 AND input_fingerprint NOT GLOB '*[^0-9a-f]*'",
+            name="fingerprint_sha256_hex",
+        ),
+        ForeignKeyConstraint(
+            ["request_id", "version_number"],
+            ["request_versions.request_id", "request_versions.version_number"],
+            ondelete="RESTRICT",
+        ),
+    )
+
+    caller_id: Mapped[UUID] = mapped_column(
+        Uuid, ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True
+    )
+    key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    input_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_id: Mapped[UUID] = mapped_column(Uuid, nullable=False)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
+
+    caller: Mapped[User] = relationship()
+    original_version: Mapped[RequestVersion] = relationship(
+        primaryjoin="and_(CreationIdempotencyRecord.request_id == RequestVersion.request_id, "
+        "CreationIdempotencyRecord.version_number == RequestVersion.version_number)",
+        foreign_keys=[request_id, version_number],
+    )
+
+
 @event.listens_for(RequestVersion, "before_update")
 @event.listens_for(RequestVersion, "before_delete")
 def protect_submitted_version(*_args: object) -> None:
@@ -290,3 +325,10 @@ def protect_submitted_version(*_args: object) -> None:
 def protect_decision_history(*_args: object) -> None:
     """Protect ORM records; Step 9 migration must protect direct SQL writes."""
     raise ValueError("Decisions and history events cannot be changed or deleted")
+
+
+@event.listens_for(CreationIdempotencyRecord, "before_update")
+@event.listens_for(CreationIdempotencyRecord, "before_delete")
+def protect_idempotency_record(*_args: object) -> None:
+    """Keep original retry mapping stable through ORM writes."""
+    raise ValueError("Creation idempotency records cannot be changed or deleted")

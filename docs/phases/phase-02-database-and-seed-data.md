@@ -1,9 +1,9 @@
 # Phase 02 - Database and seed data
 
-- Status: In progress; execution Steps 1-6 complete. Step 7 requires the user's instruction.
+- Status: In progress; execution Steps 1-7 complete. Step 8 requires the user's instruction.
 - Milestone: MVP1.
 - Prerequisite: Phase 01 complete or its unmet criteria explicitly resolved.
-- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 6 only.
+- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 7 only.
 - Handoff to create: `docs/handoffs/phase-02.md`.
 
 ## Objective
@@ -28,7 +28,7 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 4. [x] Define users, roles, mortgage applications, and manager ownership.
 5. [x] Define logical requests and immutable submitted versions.
 6. [x] Define decisions and append-only history.
-7. [ ] Define caller-scoped idempotency records.
+7. [x] Define caller-scoped idempotency records.
 8. [ ] Define and verify atomic operation boundaries.
 9. [ ] Create and verify the initial Alembic migration.
 10. [ ] Add repeatable synthetic seed data.
@@ -91,11 +91,18 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - Seven isolated file-backed tests verify exact-version links, actor/time round trips, duplicate decision rejection, missing-version failures, reviewer-only authority, and ORM update/delete rejection. `uv run --locked python -m pytest tests/persistence/test_decisions_history.py -q --tb=short`: **7 passed**. Full suite: **90 passed**; final static results are in the build log.
 - A user holding both roles can still self-review at schema level; the later business service must reject it. Decision-plus-history atomicity, current-version checks, and competing writes remain Step 8 work. All phase acceptance criteria remain unchecked. Next action: Step 7 only on user instruction.
 
+### Step 7 evidence - 2026-10-29
+
+- Began from clean `main` at `882bdfa`, after the user committed Step 6. Added `CreationIdempotencyRecord` with `(caller_id, key)` as its composite primary key, a 64-character lowercase hexadecimal SHA-256 fingerprint, and the original request/version-1 reference. Key length is 1-128 after trimming. Foreign keys require an existing caller and submitted version.
+- ORM update/delete events protect the stored retry mapping. Direct SQL protection remains Step 9 migration work. Step 8 must define canonical input, same-key replay/conflict behavior, and atomic request/version/history/idempotency writes. This step adds storage only.
+- Twelve isolated file-backed tests verify different callers can reuse a key, same-caller duplicates fail even with changed input, original references and timestamps survive reopening, invalid keys/fingerprints fail, missing references fail, and ORM changes/deletion fail. Full suite: **102 passed**; final lint/format and dependency checks are recorded in the build log.
+- No migration, seed, normal database, or endpoint was created. All phase acceptance criteria remain unchecked. Next action: Step 8 only on user instruction.
+
 ## Implementation tasks
 
 - [x] Define users/role membership and mortgage applications with a documented manager-ownership relationship.
 - [x] Define a logical request unique per application, submitted versions, current-version reference, decisions, and history events.
-- [ ] Define caller-scoped idempotency storage: key, canonical input fingerprint, and the original creation result/reference.
+- [x] Define caller-scoped idempotency storage: key, canonical input fingerprint, and the original creation result/reference.
 - [ ] Decide how exact version input and actor/time metadata are preserved through application operations.
 - [ ] Define database constraints for relationships, unique version numbers, caller/key uniqueness, and at most one decision per version.
 - [x] Establish explicit session/transaction lifetime and SQLite foreign-key/transaction configuration. Document limitations and lock handling.

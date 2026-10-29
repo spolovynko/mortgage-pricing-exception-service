@@ -6,7 +6,7 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 Phase 01 is complete: installable Python package, locked development tools, validated configuration, health API, structured request logging, and safe correlated error responses. Its fresh-install verification passed on Windows/CPython 3.12.12 with **48 tests passing**. See the [Phase 01 handoff](docs/handoffs/phase-01.md).
 
-Phase 02 Steps 1-6 are complete. SQLite integrity configuration and user/application/request/version/decision/history storage models are available; **90 tests pass** in the workspace. Idempotency, migrations, seeds, and readiness remain pending. The API still provides process liveness only. See the [Phase 02 guide](docs/phases/phase-02-database-and-seed-data.md) and [ADR 0002](docs/adr/0002-database-and-seed-data.md). Business endpoints, UI, containers, and model integration remain later-phase work.
+Phase 02 Steps 1-7 are complete. SQLite integrity configuration and user/application/request/version/decision/history/idempotency storage models are available; **102 tests pass** in the workspace. Atomic operations, migrations, seeds, and readiness remain pending. The API still provides process liveness only. See the [Phase 02 guide](docs/phases/phase-02-database-and-seed-data.md) and [ADR 0002](docs/adr/0002-database-and-seed-data.md). Business endpoints, UI, containers, and model integration remain later-phase work.
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -49,7 +49,7 @@ uv run --locked python -m ruff format --check .
 
 These commands use the locked project tools, rather than whichever pytest or Ruff is installed globally. Tested versions: pytest 9.2.0 and Ruff 0.17.3 on Windows/CPython 3.12.12. To apply formatting, use `uv run --locked python -m ruff format .`.
 
-pytest discovers `tests/`, uses `importlib` import mode without adding a source path, rejects unknown configuration/markers, and treats warnings as errors. Tests cover packaging, configuration, health, errors, logging, correlation isolation, persistence resource lifetimes, SQLite transactions, and storage-model constraints. An autouse fixture clears application settings and uses temporary working directories, keeping real `.env` files out of tests. The historical Phase 01 48-test suite also passed with deliberately invalid external settings and dotenv content. The current 90-test suite creates only temporary SQLite files; no existing database, database server, Docker, or model is needed.
+pytest discovers `tests/`, uses `importlib` import mode without adding a source path, rejects unknown configuration/markers, and treats warnings as errors. Tests cover packaging, configuration, health, errors, logging, correlation isolation, persistence resource lifetimes, SQLite transactions, and storage-model constraints. An autouse fixture clears application settings and uses temporary working directories, keeping real `.env` files out of tests. The historical Phase 01 48-test suite also passed with deliberately invalid external settings and dotenv content. The current 102-test suite creates only temporary SQLite files; no existing database, database server, Docker, or model is needed.
 
 Ruff targets Python 3.12 with a 100-character line length. Enabled rule groups check common style errors (`E`), undefined/unused names and imports (`F`), import ordering (`I`), Python modernization (`UP`), likely bug patterns (`B`), and simplifications (`SIM`). The existing .gitignore covers pytest/Ruff caches and Python bytecode.
 
@@ -95,7 +95,7 @@ Unexpected exceptions before response start receive HTTP 500:
 
 The same ID appears in `X-Correlation-ID` and the failure log. The request boundary logs the diagnostic once and sends the safe response. HTTP exceptions with 5xx status also receive a generic internal-error message. Already-started streams/background failures cannot replace a response; they are logged and rethrown. Run `uv run --locked python -m pytest tests/test_errors.py` to verify the error contract.
 
-## Persistence foundation (Phase 02, Steps 2-6)
+## Persistence foundation (Phase 02, Steps 2-7)
 
 `persistence/base.py` defines shared metadata with stable constraint names. `persistence/database.py` provides `create_database_engine(settings)` and `create_session_factory(engine)` without import-time or construction-time I/O. The caller closes sessions/connections and then disposes the engine. Use `with factory.begin() as session` for basic commit/rollback/closure; a plain session context never commits implicitly. Each operation owns its session. SQL echo is off and bound parameter values are hidden in exception text.
 
@@ -103,22 +103,24 @@ SQLite connections use Python 3.12+ `autocommit=False` and enforce foreign keys.
 
 Decisions reference exact versions and require a reviewer-role user; only one decision can exist per version. Typed history events record version, actor, and UTC time. ORM edits/deletes of these records are rejected. Step 8 must enforce self-review, current-version checks, and decision/history atomicity; Step 9 must protect stored rows from direct SQL updates/deletes.
 
-Run `uv run --locked python -m pytest tests/persistence` to verify the 39 persistence cases. These tests use temporary probe/business tables. No application code creates tables or directories. See [ADR 0002](docs/adr/0002-database-and-seed-data.md) for the resource contract and limitations.
+Creation idempotency records scope a key to a caller, store a SHA-256 fingerprint of canonical input, and point to the original request's version 1. Step 8 must define canonicalization, retry replay/conflict behavior, and atomic creation. These records are ORM-protected; direct SQL immutability needs Step 9 migration triggers.
+
+Run `uv run --locked python -m pytest tests/persistence` to verify the 51 persistence cases. These tests use temporary probe/business tables. No application code creates tables or directories. See [ADR 0002](docs/adr/0002-database-and-seed-data.md) for the resource contract and limitations.
 
 ## Continue implementation
 
 1. Read [project status](docs/project-status.md).
 2. Read [requirements](docs/requirements.md) and the [implementation plan](docs/implementation-plan.md).
-3. Read the [Phase 01 handoff](docs/handoffs/phase-01.md), [Phase 02 guide](docs/phases/phase-02-database-and-seed-data.md), and [ADR 0002](docs/adr/0002-database-and-seed-data.md). Step 7 is next, only when requested.
+3. Read the [Phase 01 handoff](docs/handoffs/phase-01.md), [Phase 02 guide](docs/phases/phase-02-database-and-seed-data.md), and [ADR 0002](docs/adr/0002-database-and-seed-data.md). Step 8 is next, only when requested.
 4. Have the agent read [AGENTS.md](AGENTS.md) before implementing that phase.
 
 Suggested phase-chat prompt:
 
 ```text
-Implement Phase 02 execution Step 7 only. Read AGENTS.md, docs/project-status.md,
+Implement Phase 02 execution Step 8 only. Read AGENTS.md, docs/project-status.md,
 the phase guide, ADR 0002, and their required references. Inspect Git/source state
-and preserve existing changes. Complete Step 7 checks and evidence records,
-then stop before Step 8. Do not commit or push.
+and preserve existing changes. Complete Step 8 checks and evidence records,
+then stop before Step 9. Do not commit or push.
 ```
 
 Change the phase number and guide for each subsequent chat. Use the same repository so the agent has access to its documentation and implementation.
