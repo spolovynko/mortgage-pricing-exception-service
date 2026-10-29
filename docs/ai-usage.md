@@ -136,3 +136,10 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Contribution: authored the caller/key retry model with fingerprint and original result reference, ORM immutability guard, isolated file-backed tests, and related ADR/progress/evidence. Used PowerShell, Git, uv, pytest, Ruff, and installed SQLAlchemy.
 - Verification: final full suite **102 passed**; lock/dependency checks passed. Initial lint/format findings were corrected; final results are in the build log.
 - Review/limits: assistant reviewed code/results; human review/acceptance and duration are not recorded. Canonicalization, replay/conflict handling, atomic business writes, migration triggers, seeds, and readiness remain pending. No normal database, commit, or push. Step 8 is user-gated.
+
+## 2026-10-29 - Phase 02, Step 8: atomic persistence operations
+
+- Task/scope: user authorized Step 8 only. Assistant inspected clean `b76a404`, source, requirements, and phase records. No subagents or product-model calls were used.
+- Contribution: authored atomic create/revise/decide persistence functions, deterministic input fingerprinting, SQLite writer-lock strategy, eight isolated database tests, and ADR/progress/evidence updates. Used PowerShell, Git, uv, pytest, Ruff, and installed SQLAlchemy.
+- Actual verification: eight focused tests and 110 total tests passed; final Ruff lint/format and lock/dependency checks passed. Initial lint/format findings were corrected. Exact commands and limits are in the build log.
+- Review/limits: assistant reviewed code/results; human review/acceptance and duration are not recorded. Migrations/triggers, seed, API wiring/readiness remain pending. No normal database, commit, or push. Step 9 is user-gated.

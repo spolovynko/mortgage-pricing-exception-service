@@ -1,9 +1,9 @@
 # Phase 02 - Database and seed data
 
-- Status: In progress; execution Steps 1-7 complete. Step 8 requires the user's instruction.
+- Status: In progress; execution Steps 1-8 complete. Step 9 requires the user's instruction.
 - Milestone: MVP1.
 - Prerequisite: Phase 01 complete or its unmet criteria explicitly resolved.
-- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 7 only.
+- Primary ADR: [ADR 0002](../adr/0002-database-and-seed-data.md), Implemented through Step 8 only.
 - Handoff to create: `docs/handoffs/phase-02.md`.
 
 ## Objective
@@ -29,7 +29,7 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 5. [x] Define logical requests and immutable submitted versions.
 6. [x] Define decisions and append-only history.
 7. [x] Define caller-scoped idempotency records.
-8. [ ] Define and verify atomic operation boundaries.
+8. [x] Define and verify atomic operation boundaries.
 9. [ ] Create and verify the initial Alembic migration.
 10. [ ] Add repeatable synthetic seed data.
 11. [ ] Add database readiness without changing process liveness.
@@ -98,12 +98,19 @@ Complete one step at a time. Record its checks, then wait for the user's instruc
 - Twelve isolated file-backed tests verify different callers can reuse a key, same-caller duplicates fail even with changed input, original references and timestamps survive reopening, invalid keys/fingerprints fail, missing references fail, and ORM changes/deletion fail. Full suite: **102 passed**; final lint/format and dependency checks are recorded in the build log.
 - No migration, seed, normal database, or endpoint was created. All phase acceptance criteria remain unchecked. Next action: Step 8 only on user instruction.
 
+### Step 8 evidence - 2026-10-29
+
+- Began from clean `main` at `b76a404` after the user committed Step 7. Added focused persistence operations for creation, revision, and exact-version human decision. Each owns one session transaction and writes its matching history event with the business rows; failed writes roll back together.
+- Creation hashes deterministic UTF-8 JSON of application ID, exact discount, and exact reason. A caller/key with matching input replays its original version-1 reference, including after revision; changed input conflicts. A new key for an already requested application conflicts. Manager ownership and role, reviewer role, current-version freshness, self-review, and one decision per version are checked server-side.
+- Each operation makes a no-op update to its existing application or request as its first SQL statement. On SQLite this obtains the writer lock before reading mutable state; competing writers serialize or receive a bounded lock error. No automatic retry is claimed. Eight isolated file-backed tests cover replay/conflict, exact versions, permissions, stale/duplicate decisions, rollback of partial creation and decision/history, competing revisions/decisions, and lock contention. Focused **8 passed**; full suite **110 passed**. Static/dependency checks are in the build log.
+- Schema still exists only in test-owned temporary databases. Step 9 must migrate it and protect immutable rows against direct SQL. API error mapping, endpoints, seeds, and readiness remain pending. Phase acceptance remains unchecked; Step 9 requires the user's instruction.
+
 ## Implementation tasks
 
 - [x] Define users/role membership and mortgage applications with a documented manager-ownership relationship.
 - [x] Define a logical request unique per application, submitted versions, current-version reference, decisions, and history events.
 - [x] Define caller-scoped idempotency storage: key, canonical input fingerprint, and the original creation result/reference.
-- [ ] Decide how exact version input and actor/time metadata are preserved through application operations.
+- [x] Decide how exact version input and actor/time metadata are preserved through application operations.
 - [ ] Define database constraints for relationships, unique version numbers, caller/key uniqueness, and at most one decision per version.
 - [x] Establish explicit session/transaction lifetime and SQLite foreign-key/transaction configuration. Document limitations and lock handling.
 - [ ] Create and verify the initial Alembic migration. Do not rely on wiping the database to evolve the schema.

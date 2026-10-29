@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: Phase 01 complete. Phase 02 Steps 1-7 are complete; caller-scoped idempotency storage is modeled and atomic operations are next. See [project status](project-status.md).
+Status: Phase 01 complete. Phase 02 Steps 1-8 are complete; atomic create, revise, and decide persistence operations are verified and the initial migration is next. See [project status](project-status.md).
 
 This plan implements the requirements and the user's agreed additions: a Python UI, optional local AI, automatic model setup, operational logging, central configuration, and one application Dockerfile with one Compose file.
 
@@ -29,7 +29,7 @@ MVP2 and MVP3 are delivery labels for this exercise, not claims of production ma
 
 ## One chat per phase
 
-Start in this repository and ask the agent to implement a specific guide. The agent reads AGENTS.md, project status, its guide, the previous handoff, and relevant decisions. It performs the work and checks, then writes the phase ADR, build-log entry, AI-use entry, and handoff.
+Start in this repository and ask the agent to implement a specific guide. The agent first proposes a short step/substep plan and a cost/performance model recommendation, then proceeds with the requested phase. It reads the current status, guide, previous handoff, and only relevant supporting sections. It performs the work and checks, then writes concise phase records as directed by AGENTS.md.
 
 The authoritative current position is [project-status.md](project-status.md). The build log records chronology; ADRs preserve reasoning; handoffs provide concise continuation context. If code and documentation disagree, inspect the evidence and repair the documentation or implementation explicitly.
 
