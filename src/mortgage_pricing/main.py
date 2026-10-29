@@ -13,8 +13,9 @@ from starlette.responses import JSONResponse
 
 from mortgage_pricing.api_foundation import DemoError, demo_error_handler
 from mortgage_pricing.api_foundation import router as demo_router
-from mortgage_pricing.api_requests import router as requests_router
 from mortgage_pricing.api_reads import router as reads_router
+from mortgage_pricing.api_requests import router as requests_router
+from mortgage_pricing.api_workflow import router as workflow_router
 from mortgage_pricing.config import Settings, get_settings
 from mortgage_pricing.errors import error_response, register_error_handlers
 from mortgage_pricing.logging_config import create_logger
@@ -84,6 +85,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(demo_router)
     app.include_router(requests_router)
     app.include_router(reads_router)
+    app.include_router(workflow_router)
 
     @app.get("/health", response_model=HealthResponse, tags=["health"])
     def health() -> HealthResponse:
