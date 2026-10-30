@@ -1,9 +1,10 @@
 """Repeatable synthetic baseline data for a database that has already migrated."""
 
 from dataclasses import dataclass
+from decimal import Decimal
 from uuid import NAMESPACE_URL, UUID, uuid5
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -11,7 +12,11 @@ from mortgage_pricing.config import Settings, get_settings
 from mortgage_pricing.observability.logging import create_logger
 from mortgage_pricing.persistence.database import create_database_engine, create_session_factory
 from mortgage_pricing.persistence.models import (
+    CreationIdempotencyRecord,
     MortgageApplication,
+    PricingDecision,
+    RequestHistoryEvent,
+    RequestVersion,
     Role,
     User,
     UserRoleMembership,
@@ -33,6 +38,10 @@ class SeedApplication:
     id: UUID
     reference: str
     manager_id: UUID
+    loan_amount: Decimal
+    property_value: Decimal
+    standard_rate_bps: int
+    term_months: int
 
 
 @dataclass(frozen=True)
@@ -53,16 +62,19 @@ USERS = (
         roles=(Role.RELATIONSHIP_MANAGER,),
     ),
     SeedUser(
-        id=uuid5(SEED_NAMESPACE, "user:grace.manager"),
-        login="grace.manager",
-        display_name="Grace Manager (Fictional)",
-        roles=(Role.RELATIONSHIP_MANAGER,),
-    ),
-    SeedUser(
         id=uuid5(SEED_NAMESPACE, "user:blake.reviewer"),
         login="blake.reviewer",
         display_name="Blake Reviewer (Fictional)",
         roles=(Role.REVIEWER,),
+    ),
+)
+
+RETIRED_USERS = (
+    SeedUser(
+        id=uuid5(SEED_NAMESPACE, "user:grace.manager"),
+        login="grace.manager",
+        display_name="Grace Manager (Fictional)",
+        roles=(Role.RELATIONSHIP_MANAGER,),
     ),
     SeedUser(
         id=uuid5(SEED_NAMESPACE, "user:casey.reviewer"),
@@ -77,16 +89,91 @@ APPLICATIONS = (
         id=uuid5(SEED_NAMESPACE, "application:demo-clean"),
         reference="SYN-MORTGAGE-DEMO-CLEAN",
         manager_id=USERS[0].id,
+        loan_amount=Decimal("250000.00"),
+        property_value=Decimal("320000.00"),
+        standard_rate_bps=425,
+        term_months=300,
     ),
     SeedApplication(
         id=uuid5(SEED_NAMESPACE, "application:ada"),
         reference="SYN-MORTGAGE-ADA-001",
         manager_id=USERS[0].id,
+        loan_amount=Decimal("180000.00"),
+        property_value=Decimal("240000.00"),
+        standard_rate_bps=475,
+        term_months=240,
     ),
     SeedApplication(
         id=uuid5(SEED_NAMESPACE, "application:grace"),
         reference="SYN-MORTGAGE-GRACE-001",
-        manager_id=USERS[1].id,
+        manager_id=USERS[0].id,
+        loan_amount=Decimal("210000.00"),
+        property_value=Decimal("300000.00"),
+        standard_rate_bps=445,
+        term_months=300,
+    ),
+    SeedApplication(
+        id=uuid5(SEED_NAMESPACE, "application:ada-002"),
+        reference="SYN-MORTGAGE-ADA-002",
+        manager_id=USERS[0].id,
+        loan_amount=Decimal("300000.00"),
+        property_value=Decimal("400000.00"),
+        standard_rate_bps=390,
+        term_months=240,
+    ),
+    SeedApplication(
+        id=uuid5(SEED_NAMESPACE, "application:ada-003"),
+        reference="SYN-MORTGAGE-ADA-003",
+        manager_id=USERS[0].id,
+        loan_amount=Decimal("325000.00"),
+        property_value=Decimal("450000.00"),
+        standard_rate_bps=410,
+        term_months=300,
+    ),
+    SeedApplication(
+        id=uuid5(SEED_NAMESPACE, "application:ada-004"),
+        reference="SYN-MORTGAGE-ADA-004",
+        manager_id=USERS[0].id,
+        loan_amount=Decimal("145000.00"),
+        property_value=Decimal("225000.00"),
+        standard_rate_bps=405,
+        term_months=180,
+    ),
+    SeedApplication(
+        id=uuid5(SEED_NAMESPACE, "application:grace-002"),
+        reference="SYN-MORTGAGE-GRACE-002",
+        manager_id=USERS[0].id,
+        loan_amount=Decimal("275000.00"),
+        property_value=Decimal("350000.00"),
+        standard_rate_bps=420,
+        term_months=300,
+    ),
+    SeedApplication(
+        id=uuid5(SEED_NAMESPACE, "application:grace-003"),
+        reference="SYN-MORTGAGE-GRACE-003",
+        manager_id=USERS[0].id,
+        loan_amount=Decimal("400000.00"),
+        property_value=Decimal("550000.00"),
+        standard_rate_bps=395,
+        term_months=240,
+    ),
+    SeedApplication(
+        id=uuid5(SEED_NAMESPACE, "application:grace-004"),
+        reference="SYN-MORTGAGE-GRACE-004",
+        manager_id=USERS[0].id,
+        loan_amount=Decimal("220000.00"),
+        property_value=Decimal("280000.00"),
+        standard_rate_bps=430,
+        term_months=360,
+    ),
+    SeedApplication(
+        id=uuid5(SEED_NAMESPACE, "application:grace-005"),
+        reference="SYN-MORTGAGE-GRACE-005",
+        manager_id=USERS[0].id,
+        loan_amount=Decimal("195000.00"),
+        property_value=Decimal("260000.00"),
+        standard_rate_bps=415,
+        term_months=240,
     ),
 )
 
@@ -119,6 +206,41 @@ def _ensure_user(session: Session, definition: SeedUser) -> bool:
     return False
 
 
+def _consolidate_demo_users(session: Session) -> None:
+    """Transfer legacy demo ownership, removing only unchanged, unused seed users."""
+    history_actors = (
+        RequestVersion.submitted_by_id,
+        PricingDecision.reviewer_id,
+        RequestHistoryEvent.actor_id,
+        CreationIdempotencyRecord.caller_id,
+    )
+    for definition in RETIRED_USERS:
+        existing = _existing_user(session, definition)
+        if existing is None:
+            continue
+        if (
+            existing.id != definition.id
+            or existing.login != definition.login
+            or existing.display_name != definition.display_name
+            or {membership.role for membership in existing.role_memberships}
+            != set(definition.roles)
+        ):
+            raise SeedConflictError("Retired demo user conflicts with existing data")
+        if any(
+            session.scalar(select(actor).where(actor == existing.id).limit(1)) is not None
+            for actor in history_actors
+        ):
+            raise SeedConflictError("Retired demo users with history must be preserved")
+        if Role.RELATIONSHIP_MANAGER in definition.roles:
+            session.execute(
+                update(MortgageApplication)
+                .where(MortgageApplication.manager_id == existing.id)
+                .values(manager_id=USERS[0].id)
+            )
+        session.delete(existing)
+        session.flush()
+
+
 def _ensure_application(session: Session, definition: SeedApplication) -> bool:
     by_id = session.get(MortgageApplication, definition.id)
     by_reference = session.scalar(
@@ -133,22 +255,30 @@ def _ensure_application(session: Session, definition: SeedApplication) -> bool:
                 id=definition.id,
                 reference=definition.reference,
                 manager_id=definition.manager_id,
+                loan_amount=definition.loan_amount,
+                property_value=definition.property_value,
+                standard_rate_bps=definition.standard_rate_bps,
+                term_months=definition.term_months,
             )
         )
         return True
     if existing.id != definition.id or existing.manager_id != definition.manager_id:
         raise SeedConflictError("Seed application identifier conflicts with existing data")
+    for field in ("loan_amount", "property_value", "standard_rate_bps", "term_months"):
+        if getattr(existing, field) is None:
+            setattr(existing, field, getattr(definition, field))
     return False
 
 
 def seed_database(settings: Settings) -> SeedResult:
-    """Insert only missing, fixed synthetic records after migrations are applied."""
+    """Reconcile the demo identities and insert missing fixed synthetic records."""
     engine = create_database_engine(settings)
     sessions = create_session_factory(engine)
     try:
         with sessions.begin() as session:
             users_created = sum(_ensure_user(session, definition) for definition in USERS)
             session.flush()
+            _consolidate_demo_users(session)
             applications_created = sum(
                 _ensure_application(session, definition) for definition in APPLICATIONS
             )

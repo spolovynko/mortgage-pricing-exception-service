@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from enum import StrEnum
 from uuid import UUID, uuid4
 
@@ -13,6 +14,7 @@ from sqlalchemy import (
     ForeignKey,
     ForeignKeyConstraint,
     Integer,
+    Numeric,
     String,
     UniqueConstraint,
     Uuid,
@@ -93,6 +95,23 @@ class MortgageApplication(Base):
         UniqueConstraint("reference", name="reference"),
         CheckConstraint("length(reference) BETWEEN 1 AND 64", name="reference_length"),
         CheckConstraint(
+            "loan_amount IS NULL OR (loan_amount > 0 AND loan_amount < 1000000000000)",
+            name="loan_amount_range",
+        ),
+        CheckConstraint(
+            "property_value IS NULL OR (property_value > 0 AND property_value < 1000000000000)",
+            name="property_value_range",
+        ),
+        CheckConstraint(
+            "standard_rate_bps IS NULL OR "
+            "(standard_rate_bps >= 0 AND typeof(standard_rate_bps) = 'integer')",
+            name="standard_rate_valid",
+        ),
+        CheckConstraint(
+            "term_months IS NULL OR (term_months > 0 AND typeof(term_months) = 'integer')",
+            name="term_valid",
+        ),
+        CheckConstraint(
             "manager_role = 'relationship_manager'",
             name="manager_role_is_relationship_manager",
         ),
@@ -113,6 +132,10 @@ class MortgageApplication(Base):
     manager_role: Mapped[Role] = mapped_column(
         ROLE_ENUM, default=Role.RELATIONSHIP_MANAGER, nullable=False
     )
+    loan_amount: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    property_value: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
+    standard_rate_bps: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    term_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
 
     manager: Mapped[User] = relationship(back_populates="managed_applications")

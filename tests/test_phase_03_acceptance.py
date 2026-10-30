@@ -111,7 +111,7 @@ def test_read_filters_history_and_original_retry_after_decision_and_revision(
         ).status_code
         == 200
     )
-    for login in ("ada.manager", "grace.manager", "blake.reviewer"):
+    for login in (user.login for user in USERS):
         actor = {"X-Demo-User": login}
         rows = client.get("/requests", headers=actor, params={"status": "declined"}).json()
         assert [row["request_id"] for row in rows] == [request_id]
@@ -144,7 +144,7 @@ def test_read_filters_history_and_original_retry_after_decision_and_revision(
     assert history[0]["version"]["discount_bps"] == 25
     assert history[-1]["version"]["discount_bps"] == 50
     decision = history[-1]["version"]["decision"]
-    assert decision["reviewer_id"] == str(USERS[2].id)
+    assert decision["reviewer_id"] == str(USERS[1].id)
     assert decision["decided_at"].endswith("Z")
     assert (
         client.get(f"/applications/{APPLICATIONS[0].id}/approved-discount", headers=MANAGER).json()[

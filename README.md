@@ -107,9 +107,11 @@ Creation idempotency records scope a key to a caller, store a SHA-256 fingerprin
 
 Run `uv run --locked python -m pytest tests/persistence` to verify persistence, or `uv run --locked python -m pytest` for the complete suite. Tests apply migrations to temporary database files. No application code creates tables or directories. Apply operational schema changes with `uv run --locked python -m alembic upgrade head`. See [ADR 0002](docs/adr/0002-database-and-seed-data.md) for the resource contract and limitations.
 
-After migration, run `uv run --locked python -m mortgage_pricing.seed` to add four clearly fictional users and three fictional mortgage applications. It reserves `SYN-MORTGAGE-DEMO-CLEAN` without requests for the create/approve demonstration. Re-running the command is safe: it creates no duplicates and preserves unrelated existing records.
+After migration, run `uv run --locked python -m mortgage_pricing.seed` to prepare two clearly fictional users: Ada (`ada.manager`), the manager for all ten demo mortgage applications, and Blake (`blake.reviewer`), the reviewer. It reserves `SYN-MORTGAGE-DEMO-CLEAN` without requests for the create/approve demonstration on fresh storage. Re-running the command creates no duplicates. For the previous four-user demo, it transfers Grace's applications to Ada and removes unused Grace/Casey identities; existing application identifiers remain unchanged. If either retired identity has submitted or audited activity, seeding fails and rolls back rather than deleting historical actors. Unrelated user records are preserved.
 
 Set `DATABASE_URL` to the intended SQLite file before migration, for example `$env:DATABASE_URL = "sqlite:///./data/mortgage_pricing.db"` in PowerShell. Ensure its parent directory exists. Tests inject temporary database settings through Alembic configuration attributes; operational setup must use migrations rather than `Base.metadata.create_all()`.
+
+Each of the ten demo applications stores a fictional loan amount and property value in EUR, a standard rate in whole basis points, and a term in months. Migration `20261030_0003` adds those application columns; seeding fills missing demo values and preserves values already saved. Selecting an application prefills the four editable request fields from the database. Submitted versions retain their own immutable context snapshots, so later application changes do not rewrite reviewed terms. See the [current workflow and complete data model](docs/current-workflow-and-data-model.md).
 
 `GET /ready` returns ready only when the configured SQLite database exists and has the current Alembic revision. Storage failure returns a correlated 503. `GET /health` stays available as process liveness.
 
@@ -130,7 +132,7 @@ Open `http://127.0.0.1:8000/`. FastAPI serves separate `ui/index.html`, `ui/styl
 
 Each new request version records structured mortgage context (purpose, rate type, loan/property values with currency, term, and standard rate) alongside a free-text reason and reason category. Competitor offer details are optional and labelled manager-reported/unverified. The form includes synthetic example presets that prefill editable fields; they do not save until Submit. No borrower-identifying or creditworthiness data is requested. Context is versioned and returned in details/history for future assistance; see [ADR 0010](docs/adr/0010-versioned-request-context.md) and the [API contract](docs/phase-03-api-contract.md).
 
-Known fictional logins are `ada.manager`, `grace.manager`, `blake.reviewer`, and `casey.reviewer`. A client can bootstrap the user selector by supplying `X-Demo-User: ada.manager` to `/demo/users`; `/demo/applications` exposes references and owners. Both internal roles can read all internal records. Only the owning manager can submit/revise; independent reviewers decide.
+Known fictional logins are `ada.manager` and `blake.reviewer`. A client can bootstrap the user selector by supplying `X-Demo-User: ada.manager` to `/demo/users`; `/demo/applications` exposes references and owners. Both internal roles can read all internal records. Only the owning manager can submit/revise; the independent reviewer decides.
 
 For a deliberately prepared demo database and running local server:
 

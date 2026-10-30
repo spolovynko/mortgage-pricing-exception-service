@@ -1,5 +1,6 @@
 """Structured context belongs to the exact request version that was submitted."""
 
+from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
 
@@ -10,6 +11,8 @@ from fastapi.testclient import TestClient
 from mortgage_pricing.config import Settings
 from mortgage_pricing.domain.request_context import RequestContext
 from mortgage_pricing.main import create_app
+from mortgage_pricing.persistence.database import create_session_factory
+from mortgage_pricing.persistence.models import MortgageApplication
 from mortgage_pricing.seed import APPLICATIONS, seed_database
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,6 +30,36 @@ def prepared_client(tmp_path: Path) -> TestClient:
     command.upgrade(config, "head")
     seed_database(settings)
     return TestClient(create_app(settings))
+
+
+def test_application_master_updates_do_not_change_submitted_request_context(tmp_path: Path) -> None:
+    with prepared_client(tmp_path) as client:
+        context = sample_context()
+        created = client.post(
+            "/requests",
+            headers={**MANAGER, "Idempotency-Key": "master-context"},
+            json={
+                "application_id": str(APPLICATIONS[0].id),
+                "discount_bps": 25,
+                "reason": "Synthetic application snapshot",
+                "context": context,
+            },
+        )
+        assert created.status_code == 201
+        request_id = created.json()["request_id"]
+        with create_session_factory(client.app.state.database_engine).begin() as session:
+            application = session.get_one(MortgageApplication, APPLICATIONS[0].id)
+            application.loan_amount = Decimal("260123.45")
+            application.property_value = Decimal("400000.00")
+            application.standard_rate_bps = 450
+            application.term_months = 240
+        applications = client.get("/demo/applications", headers=MANAGER).json()
+        current = next(row for row in applications if row["id"] == str(APPLICATIONS[0].id))
+        assert current["loan_amount"] == "260123.45"
+        assert current["property_value"] == "400000.00"
+        assert current["standard_rate_bps"] == 450 and current["term_months"] == 240
+        detail = client.get(f"/requests/{request_id}", headers=MANAGER).json()
+        assert detail["current_version"]["context"] == context
 
 
 def sample_context() -> dict[str, object]:

@@ -1,5 +1,6 @@
 """Demo identity and small read-only lookup routes for the business API."""
 
+from decimal import Decimal
 from pathlib import Path
 from typing import Annotated
 from uuid import UUID
@@ -49,6 +50,10 @@ class DemoApplication(BaseModel):
     id: UUID
     reference: str
     manager_id: UUID
+    loan_amount: Decimal | None = None
+    property_value: Decimal | None = None
+    standard_rate_bps: int | None = None
+    term_months: int | None = None
 
 
 def acting_user(request: Request, x_demo_user: str | None = Header(default=None)) -> UUID:
@@ -109,6 +114,14 @@ def demo_applications(request: Request, _actor: ActorId) -> list[DemoApplication
             select(MortgageApplication).order_by(MortgageApplication.reference)
         ).all()
         return [
-            DemoApplication(id=app.id, reference=app.reference, manager_id=app.manager_id)
+            DemoApplication(
+                id=app.id,
+                reference=app.reference,
+                manager_id=app.manager_id,
+                loan_amount=app.loan_amount,
+                property_value=app.property_value,
+                standard_rate_bps=app.standard_rate_bps,
+                term_months=app.term_months,
+            )
             for app in applications
         ]

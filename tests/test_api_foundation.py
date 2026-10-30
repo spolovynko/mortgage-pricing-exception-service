@@ -35,7 +35,7 @@ def test_demo_identity_and_lookups(tmp_path: Path) -> None:
             "correlation_id": "identity-test",
         }
         assert client.get("/demo/users", headers={"X-Demo-User": "unknown"}).status_code == 401
-        for user in (USERS[0], USERS[2]):
+        for user in USERS:
             headers = {"X-Demo-User": user.login}
             users = client.get("/demo/users", headers=headers)
             applications = client.get("/demo/applications", headers=headers)
@@ -44,6 +44,13 @@ def test_demo_identity_and_lookups(tmp_path: Path) -> None:
             assert [row["reference"] for row in applications.json()] == sorted(
                 a.reference for a in APPLICATIONS
             )
+            by_id = {row["id"]: row for row in applications.json()}
+            for application in APPLICATIONS:
+                row = by_id[str(application.id)]
+                assert row["loan_amount"] == str(application.loan_amount)
+                assert row["property_value"] == str(application.property_value)
+                assert row["standard_rate_bps"] == application.standard_rate_bps
+                assert row["term_months"] == application.term_months
         paths = client.get("/openapi.json").json()["paths"]
         assert "401" in paths["/demo/users"]["get"]["responses"]
         assert "503" in paths["/demo/applications"]["get"]["responses"]

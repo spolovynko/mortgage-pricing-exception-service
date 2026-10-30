@@ -14,9 +14,13 @@ from mortgage_pricing.main import create_app
 from mortgage_pricing.persistence.database import create_session_factory
 from mortgage_pricing.persistence.models import (
     CreationIdempotencyRecord,
+    MortgageApplication,
     PricingRequest,
     RequestHistoryEvent,
     RequestVersion,
+    Role,
+    User,
+    UserRoleMembership,
 )
 from mortgage_pricing.seed import APPLICATIONS, seed_database
 
@@ -34,7 +38,17 @@ def prepared_client(tmp_path: Path) -> TestClient:
     config.attributes["settings"] = settings
     command.upgrade(config, "head")
     seed_database(settings)
-    return TestClient(create_app(settings))
+    client = TestClient(create_app(settings))
+    with create_session_factory(client.app.state.database_engine).begin() as session:
+        other_manager = User(
+            id=uuid4(), login="test.other.manager", display_name="Synthetic ownership test manager"
+        )
+        other_manager.role_memberships.append(UserRoleMembership(role=Role.RELATIONSHIP_MANAGER))
+        session.add(other_manager)
+        session.flush()
+        application = session.get_one(MortgageApplication, APPLICATIONS[2].id)
+        application.manager_id = other_manager.id
+    return client
 
 
 def payload(application_index: int = 0) -> dict[str, object]:

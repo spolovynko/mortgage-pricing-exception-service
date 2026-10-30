@@ -2,6 +2,7 @@
 
 import json
 from collections.abc import Iterator
+from decimal import Decimal
 from hashlib import sha256
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -18,12 +19,13 @@ from mortgage_pricing.persistence.database import create_database_engine, create
 from mortgage_pricing.persistence.models import (
     CreationIdempotencyRecord,
     DecisionOutcome,
+    MortgageApplication,
     PricingDecision,
     RequestHistoryEvent,
     RequestVersion,
 )
 from mortgage_pricing.persistence.operations import create_request, decide_request
-from mortgage_pricing.seed import APPLICATIONS, seed_database
+from mortgage_pricing.seed import APPLICATIONS, USERS, seed_database
 from tests.persistence.test_operations import prepare
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -78,6 +80,97 @@ def test_upgrade_creates_schema_and_second_run_preserves_rows(
         assert created.request_id is not None
 
 
+def test_application_financial_migration_preserves_existing_approval_history(
+    migrated_database: tuple[Settings, Engine, sessionmaker[Session]],
+) -> None:
+    settings, engine, sessions = migrated_database
+    seed_database(settings)
+    context = {
+        "application": {
+            "purpose": "purchase",
+            "rate_type": "fixed",
+            "loan_amount": "250000.00",
+            "property_value": "320000.00",
+            "currency_code": "EUR",
+            "term_months": 300,
+            "standard_rate_bps": 425,
+        },
+        "reason_category": "other",
+    }
+    created = create_request(
+        sessions,
+        caller_id=USERS[0].id,
+        application_id=APPLICATIONS[0].id,
+        discount_bps=25,
+        reason="Synthetic historical approval",
+        idempotency_key="financial-migration",
+        context=context,
+    )
+    decide_request(
+        sessions,
+        reviewer_id=USERS[1].id,
+        request_id=created.request_id,
+        expected_version=1,
+        outcome=DecisionOutcome.APPROVED,
+    )
+    protected_tables = [
+        table
+        for table in MortgageApplication.metadata.tables.values()
+        if table.name != "mortgage_applications"
+    ]
+    with sessions() as session:
+        before = {
+            table.name: session.execute(table.select().order_by(*table.primary_key.columns)).all()
+            for table in protected_tables
+        }
+    engine.dispose()
+    config = Config(str(ROOT / "alembic.ini"))
+    config.attributes["settings"] = settings
+    command.downgrade(config, "20261029_0002")
+    assert "loan_amount" not in {
+        c["name"] for c in inspect(engine).get_columns("mortgage_applications")
+    }
+    command.upgrade(config, "head")
+    with sessions() as session:
+        application = session.get_one(MortgageApplication, APPLICATIONS[0].id)
+        assert application.loan_amount is application.property_value is None
+        assert application.standard_rate_bps is application.term_months is None
+    seed_database(settings)
+    with sessions() as session:
+        application = session.get_one(MortgageApplication, APPLICATIONS[0].id)
+        assert application.loan_amount == Decimal("250000.00")
+        assert application.property_value == Decimal("320000.00")
+        assert application.standard_rate_bps == 425 and application.term_months == 300
+        for table in protected_tables:
+            assert (
+                session.execute(table.select().order_by(*table.primary_key.columns)).all()
+                == before[table.name]
+            )
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("loan_amount", 0),
+        ("property_value", -1),
+        ("standard_rate_bps", -1),
+        ("term_months", 0),
+        ("standard_rate_bps", 1.5),
+        ("term_months", 1.5),
+    ],
+)
+def test_migration_enforces_application_financial_bounds(
+    migrated_database: tuple[Settings, Engine, sessionmaker[Session]], field: str, value: float
+) -> None:
+    settings, engine, _sessions = migrated_database
+    seed_database(settings)
+    with pytest.raises(IntegrityError), engine.begin() as connection:
+        connection.execute(
+            text(f"UPDATE mortgage_applications SET {field} = :value WHERE id = :id"),
+            {"value": value, "id": APPLICATIONS[0].id.hex},
+        )
+
+
 def test_context_migration_preserves_existing_request_versions(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,
@@ -86,11 +179,37 @@ def test_context_migration_preserves_existing_request_versions(tmp_path: Path) -
     config = Config(str(ROOT / "alembic.ini"))
     config.attributes["settings"] = settings
     command.upgrade(config, "20261029_0001")
-    seed_database(settings)
 
     request_id = uuid4()
     engine = create_database_engine(settings)
     with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO users (id, login, display_name, created_at) "
+                "VALUES (:id, :login, :display_name, '2026-10-29 00:00:00.000000')"
+            ),
+            {"id": USERS[0].id.hex, "login": USERS[0].login, "display_name": USERS[0].display_name},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO user_role_memberships (user_id, role) "
+                "VALUES (:id, 'relationship_manager')"
+            ),
+            {"id": USERS[0].id.hex},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO mortgage_applications "
+                "(id, reference, manager_id, manager_role, created_at) "
+                "VALUES (:id, :reference, :manager_id, 'relationship_manager', "
+                "'2026-10-29 00:00:00.000000')"
+            ),
+            {
+                "id": APPLICATIONS[0].id.hex,
+                "reference": APPLICATIONS[0].reference,
+                "manager_id": USERS[0].id.hex,
+            },
+        )
         connection.execute(
             text(
                 "INSERT INTO pricing_requests "

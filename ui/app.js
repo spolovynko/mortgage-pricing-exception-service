@@ -18,11 +18,16 @@ const state = {
   history: [],
   pricing: null,
   applicationFilter: "",
+  createApplicationId: "",
   statusFilter: "",
+  requestSearch: "",
+  applicationSearch: "",
   notice: null,
   revisionDraft: null,
   busy: false,
 };
+
+const applicationFinancialFields = ["loan_amount", "property_value", "standard_rate_bps", "term_months"];
 
 const labels = {
   relationship_manager: "Relationship manager",
@@ -196,36 +201,6 @@ function noticeHtml() {
   return `<div class="notice ${kind}" role="status">${escapeHtml(state.notice.message)}${details}${retry}${refresh}${reconnect}</div>`;
 }
 
-function navHtml() {
-  const tabs = ["requests", ...(isReviewer() ? ["review"] : []), "history"];
-  return `<nav class="nav" aria-label="Main navigation">${tabs.map((tab) =>
-    `<button type="button" class="${state.screen === tab ? "active" : ""}" data-screen="${tab}" aria-current="${state.screen === tab ? "page" : "false"}">${tab[0].toUpperCase()}${tab.slice(1)}</button>`
-  ).join("")}</nav>`;
-}
-
-function aiHtml() {
-  const enabled = sessionStorage.getItem("useAiAssistance") === "true";
-  return `<section class="card ai-control" aria-label="AI assistance preference">
-    <div><strong>Use AI assistance</strong><div class="help">This preference is local to this browser tab.</div></div>
-    <label class="toggle"><input id="ai-toggle" type="checkbox" ${enabled ? "checked" : ""}> On</label>
-    <button type="button" class="button" disabled title="AI assessment is unavailable until Phase 06">Generate assessment</button>
-    <span class="help">Unavailable until Phase 06.</span>
-  </section>`;
-}
-
-function identityHtml() {
-  const user = currentUser();
-  const roles = user?.roles.map((role) => labels[role] || role).join(", ") || "";
-  identityPanel.innerHTML = `<label for="demo-user">Demo user</label>
-    <select id="demo-user" aria-label="Demo user">${state.users.map((item) =>
-      `<option value="${escapeHtml(item.login)}" ${item.login === state.login ? "selected" : ""}>${escapeHtml(item.display_name)} (${escapeHtml(item.login)})</option>`
-    ).join("")}</select><span>${escapeHtml(roles)}</span>`;
-}
-
-function empty(message, title = "Nothing to show yet") {
-  return `<div class="empty"><strong>${escapeHtml(title)}</strong>${escapeHtml(message)}</div>`;
-}
-
 function appFor(referenceOrId) {
   return state.applications.find((item) => item.id === referenceOrId || item.reference === referenceOrId);
 }
@@ -317,175 +292,6 @@ function contextSummary(context) {
     ${competitor ? `<dt>Reported competitor offer</dt><dd>${competitor.rate_bps} bps${competitor.expires_on ? ` · expires ${escapeHtml(competitor.expires_on)}` : ""} · unverified</dd>` : ""}`;
 }
 
-function listRequests(rows, selectedId = "") {
-  if (!rows.length) return empty("New submissions will appear here.", "No requests match these filters");
-  return `<div class="request-list">${rows.map((row) => `
-    <div class="request-row ${row.request_id === selectedId ? "selected" : ""}">
-      <div><div class="request-reference">${escapeHtml(row.application_reference)}</div>
-        <div class="request-meta">Version ${row.current_version_number}</div></div>
-      <span class="badge ${escapeHtml(row.status)}">${escapeHtml(row.status)}</span>
-      <button type="button" class="button" data-action="open-request" data-request="${escapeHtml(row.request_id)}">Open</button>
-    </div>`).join("")}</div>`;
-}
-
-function detailFields(detail) {
-  const version = detail.current_version;
-  const decision = version.decision;
-  return `<dl class="details">
-    <dt>Application</dt><dd>${escapeHtml(detail.application_reference)}</dd>
-    <dt>Version</dt><dd>${version.version_number}</dd>
-    <dt>Status</dt><dd><span class="badge ${escapeHtml(version.status)}">${escapeHtml(version.status)}</span></dd>
-    <dt>Requested discount</dt><dd>${version.discount_bps} bps</dd>
-    <dt>Submitted by</dt><dd>${escapeHtml(version.submitted_by_login)}</dd>
-    <dt>Submitted at</dt><dd>${escapeHtml(timestamp(version.submitted_at))}</dd>
-    ${version.context ? contextSummary(version.context) : ""}
-    <dt>Reason submitted</dt><dd>${escapeHtml(version.reason)}</dd>
-    ${decision ? `<dt>Decision</dt><dd>${escapeHtml(decision.outcome)} by ${escapeHtml(decision.reviewer_login)}</dd>
-      <dt>Decided at</dt><dd>${escapeHtml(timestamp(decision.decided_at))}</dd>` : ""}
-  </dl>`;
-}
-
-function pricingHtml() {
-  if (!state.detail || !state.pricing) return "";
-  const pricing = state.pricing;
-  const text = pricing.status === "approved"
-    ? `${pricing.discount_bps} bps · version ${pricing.version_number} · request ${pricing.request_id}`
-    : "No current approved discount.";
-  return `<section class="card"><h3>Current approved pricing</h3><p>${escapeHtml(text)}</p></section>`;
-}
-
-function createIntentForm() {
-  const ownedApps = state.applications.filter((item) => currentUser() && item.manager_id === currentUser().id);
-  if (!ownedApps.length) return empty("No applications are assigned to this manager.");
-  const intent = getCreateIntent();
-  const draft = intent?.payload;
-  const context = draft?.context;
-  const selectedApp = ownedApps.some((item) => item.id === draft?.application_id)
-    ? draft.application_id : ownedApps[0].id;
-  return `<section class="card"><div class="card-header"><h2>Create request</h2></div>
-    <form id="create-form">
-      <div class="field"><label for="create-application">Application</label>
-        <select id="create-application" name="application_id" required>${appOptions(ownedApps, selectedApp)}</select></div>
-      <div class="field"><label for="create-discount">Discount (basis points)</label>
-        <input id="create-discount" name="discount_bps" type="number" min="1" step="1" value="${escapeHtml(draft?.discount_bps ?? "")}" required></div>
-      <div class="sample-controls"><label for="synthetic-example">Synthetic example</label>
-        <div class="button-row"><select id="synthetic-example" name="synthetic_example">
-          <option value="">Choose an example to prefill</option><option value="competition">Competitive offer</option>
-          <option value="retention">Customer retention</option><option value="relationship">Relationship request</option>
-        </select><button class="button" type="button" data-action="fill-synthetic">Fill form</button></div>
-        <span class="help">Fills a clearly synthetic draft; no request is saved until you submit.</span></div>
-      ${contextFields("create", context)}
-      <div class="field"><label for="create-reason">Free-text reason (1–2,000 characters)</label>
-        <textarea id="create-reason" name="reason" maxlength="2000" required>${escapeHtml(draft?.reason ?? "")}</textarea></div>
-      <div class="button-row"><button class="button primary" type="submit" ${state.busy ? "disabled" : ""}>Submit request</button></div>
-    </form>
-  </section>`;
-}
-
-function revisionForm(detail) {
-  const owner = appFor(detail.application_id)?.manager_id === currentUser()?.id;
-  if (!owner || !["approved", "declined"].includes(detail.status)) return "";
-  const version = detail.current_version;
-  const draft = state.revisionDraft || {
-    discount_bps: version.discount_bps,
-    reason: version.reason,
-    context: version.context,
-  };
-  return `<section class="card"><h3>Revise terms</h3>
-    <p class="help">A revision creates a new pending version that needs fresh review.</p>
-    <form id="revision-form" class="inline-form">
-      <div class="field"><label for="revision-discount">New discount (basis points)</label>
-        <input id="revision-discount" name="discount_bps" type="number" min="1" step="1" value="${escapeHtml(draft.discount_bps ?? "")}" required></div>
-      ${contextFields("revision", draft.context)}
-      <div class="field"><label for="revision-reason">Free-text reason for revised terms</label>
-        <textarea id="revision-reason" name="reason" maxlength="2000" required>${escapeHtml(draft.reason ?? "")}</textarea></div>
-      <button class="button primary" type="submit" ${state.busy ? "disabled" : ""}>Submit revision</button>
-    </form>
-  </section>`;
-}
-
-function renderRequests() {
-  const rows = state.requests.filter((row) =>
-    (!state.applicationFilter || row.application_id === state.applicationFilter)
-    && (!state.statusFilter || row.status === state.statusFilter)
-  );
-  const selected = state.detail && rows.find((item) => item.request_id === state.detail.request_id);
-  const applications = state.applications;
-  return `<div class="page-heading"><div><h1>Requests</h1><p class="subtitle">Create and track pricing exception requests.</p></div></div>
-    ${navHtml()}${noticeHtml()}${aiHtml()}
-    <div class="layout"><div class="stack">
-      ${isManager() ? createIntentForm() : ""}
-      <section class="card"><div class="card-header"><h2>Request list</h2><button class="button" data-action="reload">Refresh</button></div>
-        <div class="filters">
-          <div class="field"><label for="application-filter">Application filter</label><select id="application-filter"><option value="">All applications</option>${appOptions(applications, state.applicationFilter)}</select></div>
-          <div class="field"><label for="status-filter">Status filter</label><select id="status-filter"><option value="">All statuses</option>${["pending", "approved", "declined"].map((status) => `<option value="${status}" ${status === state.statusFilter ? "selected" : ""}>${status}</option>`).join("")}</select></div>
-        </div>
-        ${listRequests(rows, state.selectedRequestId)}
-      </section>
-    </div><div class="stack">
-      <section class="card"><div class="card-header"><h2>Request details</h2></div>
-        ${selected ? detailFields(state.detail) : empty("Select a request to review its exact terms and decision.", "No request selected")}
-      </section>
-      ${pricingHtml()}
-      ${state.detail ? revisionForm(state.detail) : ""}
-    </div></div>`;
-}
-
-function renderReview() {
-  const pending = state.requests.filter((item) => item.status === "pending");
-  const detail = state.reviewDetail;
-  const own = detail?.current_version.submitted_by_login === state.login;
-  const canDecide = detail?.status === "pending" && !own && isReviewer();
-  return `<div class="page-heading"><div><h1>Review</h1><p class="subtitle">Decide the version shown below.</p></div></div>
-    ${navHtml()}${noticeHtml()}${aiHtml()}
-    <div class="layout"><section class="card"><div class="card-header"><h2>Pending requests</h2><button class="button" data-action="reload">Refresh</button></div>
-      ${pending.length ? listRequests(pending, state.selectedReviewId) : empty("There are no pending requests to review.", "Review queue is clear")}
-    </section><section class="card"><h2>Terms for review</h2>
-      ${detail ? detailFields(detail) : empty("Open a pending request to review its current version.", "No request opened")}
-      ${own ? '<div class="notice warning">You submitted this request and cannot review it.</div>' : ""}
-      ${canDecide ? `<div class="button-row">
-        <button class="button primary" data-action="decide" data-outcome="approved" ${state.busy ? "disabled" : ""}>Approve version ${detail.current_version.version_number}</button>
-        <button class="button danger" data-action="decide" data-outcome="declined" ${state.busy ? "disabled" : ""}>Decline version ${detail.current_version.version_number}</button>
-      </div>` : ""}
-    </section></div>`;
-}
-
-function renderHistory() {
-  const selected = state.requests.find((item) => item.request_id === state.historyRequestId);
-  const events = state.history.map((event) => {
-    const olderApproval = event.event_type === "approved" && event.version_number < (selected?.current_version_number || 0);
-    const title = olderApproval ? "Earlier approval (historical)" : `${event.event_type[0].toUpperCase()}${event.event_type.slice(1)}`;
-    const decision = event.version?.decision;
-    return `<article class="history-event">
-      <div class="history-title">${escapeHtml(title)} · version ${event.version_number}</div>
-      <div class="history-meta">${escapeHtml(event.actor_login)} · ${escapeHtml(timestamp(event.occurred_at))}</div>
-      <details><summary>View version ${event.version_number} terms · ${escapeHtml(event.event_type)}</summary>
-        <p class="help">These are the associated version terms and final decision, not a status snapshot from the event time.</p>
-        <dl class="details"><dt>Discount</dt><dd>${event.version.discount_bps} bps</dd>
-          <dt>Reason</dt><dd>${escapeHtml(event.version.reason)}</dd>
-          ${event.version.context ? contextSummary(event.version.context) : ""}
-          <dt>Submitted by</dt><dd>${escapeHtml(event.version.submitted_by_login)}</dd>
-          <dt>Submitted at</dt><dd>${escapeHtml(timestamp(event.version.submitted_at))}</dd>
-          ${decision ? `<dt>Decision</dt><dd>${escapeHtml(decision.outcome)} by ${escapeHtml(decision.reviewer_login)} · ${escapeHtml(timestamp(decision.decided_at))}</dd>` : ""}
-        </dl>
-      </details>
-    </article>`;
-  }).join("");
-  return `<div class="page-heading"><div><h1>History</h1><p class="subtitle">A chronological record of terms and decisions.</p></div></div>
-    ${navHtml()}${noticeHtml()}${aiHtml()}
-    <section class="card"><div class="field"><label for="history-request">Request history</label>
-      <select id="history-request"><option value="">Select a request</option>${requestOptions(state.requests, state.historyRequestId)}</select></div>
-      ${selected ? `<div class="history-list">${events || empty("No history events were returned.")}</div>` : empty("Select a request to inspect its events.", "No request selected")}
-    </section>`;
-}
-
-function render() {
-  identityHtml();
-  const body = state.screen === "review" ? renderReview()
-    : state.screen === "history" ? renderHistory() : renderRequests();
-  app.innerHTML = body;
-}
-
 function setError(error, { refresh = false, retry = false, reconnect = false } = {}) {
   state.notice = {
     kind: "error",
@@ -560,6 +366,7 @@ async function loadHistory(requestId) {
 }
 
 async function refreshAfterWrite(requestId, message, target = "detail") {
+  state.screen = target === "review" ? "review" : "requests";
   await loadWorkspace();
   if (state.notice?.kind !== "error") await loadRequest(requestId, target);
   if (state.notice?.kind === "error") {
@@ -621,9 +428,12 @@ async function sendCreate(intent) {
       idempotencyKey: intent.key,
     });
     clearCreateIntent();
+    clearFormDraft("create");
+    state.createApplicationId = "";
+    state.screen = "requests";
     await refreshAfterWrite(
       result.request_id,
-      `Submitted: ${result.request_id} · version ${result.version_number}${result.replayed ? " (retried safely)" : ""}.`,
+      `Request submitted for review · version ${result.version_number}${result.replayed ? " (existing submission recovered)" : ""}.`,
     );
   } catch (error) {
     setError(error, { retry: true });
@@ -634,6 +444,7 @@ async function sendCreate(intent) {
 }
 
 async function submitCreate(form) {
+  saveFormDraft(form);
   const context = readContext(form);
   if (!context) return;
   const payload = createPayload(form, context);
@@ -646,6 +457,7 @@ async function submitCreate(form) {
 
 async function submitRevision(form) {
   const data = new FormData(form);
+  saveFormDraft(form);
   const context = readContext(form);
   if (!context) return;
   const draft = {
@@ -655,6 +467,7 @@ async function submitRevision(form) {
   };
   state.revisionDraft = draft;
   const openedVersion = state.detail.current_version.version_number;
+  const revisionReference = `${state.detail.request_id}:${openedVersion}`;
   state.busy = true;
   state.notice = null;
   render();
@@ -664,6 +477,7 @@ async function submitRevision(form) {
       body: { expected_version: openedVersion, ...draft },
     });
     state.revisionDraft = null;
+    clearFormDraft("revision", revisionReference);
     await refreshAfterWrite(
       result.request_id,
       `Revision submitted as pending version ${result.version_number}; fresh review is required.`,
@@ -714,25 +528,49 @@ async function bootstrap() {
   }
 }
 
-identityPanel.addEventListener("change", async (event) => {
-  if (event.target.id !== "demo-user") return;
-  state.login = event.target.value;
+identityPanel.addEventListener("click", async (event) => {
+  const button = event.target.closest("button[data-login]");
+  if (!button || state.busy || button.dataset.login === state.login) return;
+  if (!state.users.some((user) => user.login === button.dataset.login)) return;
+  state.login = button.dataset.login;
   sessionStorage.setItem("demoLogin", state.login);
   state.screen = "requests";
+  state.createApplicationId = "";
   state.selectedRequestId = "";
   state.selectedReviewId = "";
   state.historyRequestId = "";
   state.detail = null;
   state.reviewDetail = null;
+  state.revisionDraft = null;
   state.history = [];
   state.pricing = null;
   await loadWorkspace();
+  render({ focusHeading: true });
+});
+
+app.addEventListener("input", (event) => {
+  const form = event.target.form;
+  if (form && ["create-form", "revision-form"].includes(form.id)) {
+    saveFormDraft(form);
+    if (form.id === "create-form") updateComposerPreview(form);
+  } else if (event.target.id === "request-search") {
+    state.requestSearch = event.target.value;
+    render();
+  } else if (event.target.id === "application-search") {
+    state.applicationSearch = event.target.value;
+    render();
+  }
 });
 
 app.addEventListener("change", async (event) => {
-  const { id, value, checked } = event.target;
-  if (id === "ai-toggle") {
-    sessionStorage.setItem("useAiAssistance", String(checked));
+  const { id, value } = event.target;
+  const form = event.target.form;
+  if (form && ["create-form", "revision-form"].includes(form.id)) saveFormDraft(form);
+  if (id === "create-application") {
+    state.createApplicationId = value;
+    const application = appFor(value);
+    for (const field of applicationFinancialFields) form.elements.namedItem(field).value = application?.[field] ?? "";
+    saveFormDraft(form);
     render();
   } else if (id === "application-filter") {
     state.applicationFilter = value;
@@ -747,20 +585,47 @@ app.addEventListener("change", async (event) => {
 
 app.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (state.busy) return;
   if (event.target.id === "create-form") await submitCreate(event.target);
   if (event.target.id === "revision-form") await submitRevision(event.target);
 });
 
-app.addEventListener("click", async (event) => {
+async function handleWorkspaceClick(event) {
   const button = event.target.closest("button");
-  if (!button) return;
+  if (!button || state.busy) return;
   if (button.dataset.screen) {
     state.screen = button.dataset.screen;
     state.notice = null;
-    render();
+    render({ focusHeading: true });
+  } else if (button.dataset.action === "new-request") {
+    const application = appFor(button.dataset.application);
+    if (!application || application.manager_id !== currentUser()?.id) return;
+    const draft = getFormDraft("create") || {};
+    draft.application_id = application.id;
+    for (const field of applicationFinancialFields) draft[field] = String(application[field] ?? "");
+    sessionStorage.setItem(formDraftKey("create"), JSON.stringify(draft));
+    state.screen = "create";
+    state.notice = null;
+    render({ focusHeading: true });
   } else if (button.dataset.action === "open-request") {
     const target = state.screen === "review" ? "review" : "detail";
+    state.screen = target === "review" ? "review" : "requests";
     await loadRequest(button.dataset.request, target);
+  } else if (button.dataset.action === "close-detail") {
+    state.detail = null;
+    state.pricing = null;
+    state.selectedRequestId = "";
+    render({ focusHeading: true });
+  } else if (button.dataset.action === "view-history") {
+    state.screen = "history";
+    await loadHistory(button.dataset.request);
+    render({ focusHeading: true });
+  } else if (button.dataset.action === "discard-create") {
+    clearFormDraft("create");
+    clearCreateIntent();
+    state.createApplicationId = "";
+    state.notice = { kind: "success", message: "Draft discarded. Saved requests are unchanged." };
+    render({ focusHeading: true });
   } else if (button.dataset.action === "decide") {
     await decide(button.dataset.outcome);
   } else if (button.dataset.action === "fill-synthetic") {
@@ -769,16 +634,17 @@ app.addEventListener("click", async (event) => {
     if (sample) {
       form.elements.namedItem("discount_bps").value = sample.discount_bps;
       form.elements.namedItem("reason").value = sample.reason;
-      const context = sample.context;
-      for (const [name, value] of Object.entries(context.application)) {
-        form.elements.namedItem(name).value = value;
+      const application = appFor(form.elements.namedItem("application_id").value);
+      for (const [name, value] of Object.entries(sample.context.application)) {
+        form.elements.namedItem(name).value = applicationFinancialFields.includes(name) ? application?.[name] ?? value : value;
       }
-      form.elements.namedItem("reason_category").value = context.reason_category;
-      const offer = context.competitor_offer;
-      const details = form.querySelector("details.optional-fields");
-      details.open = Boolean(offer);
+      form.elements.namedItem("reason_category").value = sample.context.reason_category;
+      const offer = sample.context.competitor_offer;
+      form.querySelector("details.optional-fields").open = Boolean(offer);
       form.elements.namedItem("competitor_rate_bps").value = offer?.rate_bps ?? "";
       form.elements.namedItem("competitor_expires_on").value = offer?.expires_on ?? "";
+      saveFormDraft(form);
+      updateComposerPreview(form);
     }
   } else if (button.dataset.action === "retry-create") {
     const intent = getCreateIntent();
@@ -799,6 +665,9 @@ app.addEventListener("click", async (event) => {
     if (state.selectedReviewId) await loadRequest(state.selectedReviewId, "review");
     if (state.historyRequestId) await loadHistory(state.historyRequestId);
   }
-});
+}
+
+app.addEventListener("click", handleWorkspaceClick);
+document.querySelector("#navigation").addEventListener("click", handleWorkspaceClick);
 
 bootstrap();
