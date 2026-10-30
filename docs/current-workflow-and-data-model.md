@@ -33,7 +33,7 @@ flowchart TD
     C -->|Either internal role| V[Inspect requests, versions, decisions and history]
 ```
 
-- The dropdown supplies `X-Demo-User`; this is simulated identity, not authentication. Managers and reviewers can read internal records. Only an application's owning manager submits/revises it; a reviewer cannot decide a request they own or a version they submitted.
+- The Manager/Reviewer tabs select the simulated identity supplied as `X-Demo-User`; this is simulated identity, not authentication. Managers and reviewers can read internal records. Only an application's owning manager submits/revises it; a reviewer cannot decide a request they own or a version they submitted.
 - Each application has at most one logical pricing request. Changing terms uses a new version of that request, not a second logical request.
 - The server captures the exact version opened for a decision/revision using `expected_version`. A stale operation fails rather than silently applying to newer terms.
 - A decision approves the submitted discount exactly or declines it. There is no reviewer-adjusted discount, decision-comment field, automated eligibility engine, or live LLM assessment.

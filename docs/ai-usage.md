@@ -201,3 +201,8 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 - Contribution/tools: Codex implemented the image, safe startup/readiness behavior, Compose operations, tests, and phase records in five user-gated steps. PowerShell, Git, uv, pytest, Ruff, Node, Docker/Compose, HTTP calls, and the in-app browser were used. No subagents, paid API, GPU, or model runtime were used.
 - Review/evidence: the assistant inspected code and actual command output, corrected transaction and editable-install failures exposed by focused/live checks, and exercised isolated synthetic containers through API and browser create/approve/retrieve, recreation persistence, repeated seeds, health, logs, and failure cases. Exact commands/results are consolidated in the [Phase 05 build entry](build-log.md#2026-10-29---phase-05-containerisation).
 - Limits: automated tests, assistant-operated browser checks, and live container observations are distinct; human review/acceptance and active work duration are not recorded. No production authentication, external Linux host, backup/restore, multi-instance SQLite, AI behavior, assistant commit, or push is claimed.
+
+
+## 2026-10-30 - Phase 06 UI, database and reproducibility
+
+Codex implemented and reviewed the workspace, demo-data and migration changes, executed tests and isolated reproduction, and prepared phase records; the user operated live request decisions and considered UI Step 2 done. Assistant verification is not formal phase acceptance. See [build evidence](build-log.md#2026-10-30---phase-06-ui-database-and-reproducibility) for results and limits. No subagents, paid API or model runtime were used.

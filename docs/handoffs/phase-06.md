@@ -1,0 +1,8 @@
+# Phase 06 handoff - UI, database and reproducibility
+
+- Date: 2026-10-30 (Europe/Brussels). Status: Implemented and assistant-verified; the user considered UI Step 2 done. Formal Phase 06 acceptance and active work time are not recorded.
+- Git: `main`, code at `4ffd5de`; Phase 06 records are uncommitted. No assistant commit or push.
+- Read first: [status](../project-status.md), [Phase 06 guide](../phases/phase-06-ui-and-database-hardening.md), [ADR 0006](../adr/0006-ui-and-database-hardening.md), and [verification](../build-log.md#2026-10-30---phase-06-ui-database-and-reproducibility).
+- Contracts: one same-origin UI/API process; demo Manager and Reviewer tabs; ten fictional applications assigned to Ada; financial defaults are seeded without overwriting existing values and copied into immutable version context. Seed refuses removal of retired actors with history. Model use remains off and is deferred to Phase 09.
+- Reproduce: follow [README](../../README.md) for Docker Compose or Python setup. Isolated Compose build, request/approval/history, cached recreation, and SQLite online backup/restore passed. Synthetic volume `mpes-phase06-compose-1030_application-data` and temporary source copy were preserved. The checks used this Windows/WSL2 host and caches; no second-machine or offline first-build claim. The user operated live review/revision; assistant inspected results. Exhaustive keyboard/responsive and live retry/error checks remain limits; see build evidence.
+- Records: guide, status, build/AI logs, ADR/index, README, workflow document and this handoff. Next: Phase 07 only when separately authorized; core mode requires no model, GPU or paid API.

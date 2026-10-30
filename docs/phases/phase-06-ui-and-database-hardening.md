@@ -1,6 +1,6 @@
 # Phase 06 - UI redesign, database review, and reproducibility
 
-- Status: In progress; initial code/database review performed, application changes not started. The user selected a substantial UI redesign on 2026-10-30.
+- Status: Implemented and assistant-verified. The user considered Step 2 complete; formal Phase 06 acceptance is not recorded. See [verification](../build-log.md#2026-10-30---phase-06-ui-database-and-reproducibility).
 - Milestone: MVP2 hardening.
 - Prerequisite: Phase 05 implemented human UI/API and container workflow.
 - Primary ADR to create: `docs/adr/0006-ui-and-database-hardening.md`.
@@ -15,23 +15,29 @@ Solidify the existing human workflow through a substantial UI redesign, an evide
 
 [AGENTS.md](../../AGENTS.md), current [project status](../project-status.md), the [Phase 05 handoff](../handoffs/phase-05.md), and affected UI/API/persistence code. Consult requirements, engineering guidelines, architecture, and ADRs only for concrete review questions.
 
-## Agreed phase plan
+## Agreed phase plan and closeout
 
-1. Review the current UI and database; report concrete usability/integrity findings and prioritise fixes before changing application behavior. Confirm the user's preferred extent of UI changes.
-2. Redesign the workspace substantially: persistent navigation, a scan-friendly request queue, a dedicated request composer, a focused review/detail layout, and a readable version/decision timeline. Preserve unsent drafts across navigation/filter changes and keyboard focus across updates; provide clear labels, validation/errors, loading/empty states, responsive layout, and safe rendering. Keep identity, retries, exact-version review, and history usable; clearly label deferred AI without giving unavailable controls priority over the human workflow.
-3. Address substantiated database findings: schema/foreign keys, immutable records, exact-version links, transaction/race boundaries, migration compatibility, and repeatable synthetic seeds. Add migrations only when necessary; never reset live storage.
-4. Verify reproducibility from an isolated source copy and new named storage using README-only instructions: build/start, migrate/seed, create/revise/decide/history, restart persistence, and an isolated backup/restore exercise. Identify architecture/resource prerequisites and distinguish same-host verification from actual second-machine evidence.
-5. Run the phase gate once and consolidate the ADR, handoff, guide, status, build/AI logs, and relevant runtime guidance. Stop before Phase 07.
+Work one user-authorized step at a time. Report changes, checks and limits in chat, then wait for authorization before the next step. Reuse observed evidence; do not repeat checks unless code changes, failures or a concrete concern justify it. Model choices below are suggestions; the user controls selection.
+
+| Step | Substeps | Why / result | Suggested model and effort |
+| --- | --- | --- | --- |
+| 1. Reconcile scope and evidence | Inspect Git, this guide, current status, the Phase 05 handoff, affected code and existing evidence. Identify what was implemented and what still lacks verification or a user decision; check the current UI preference without assuming a visual style was accepted. | Establish an accurate closeout scope without repeating completed work or claiming human acceptance. | GPT-6 Luna, medium |
+| 2. Verify UI workflow | Check manager/reviewer switching, application prefill, draft preservation, create/retry, review, revision, history, stale/error handling and keyboard/responsive behavior. Run focused checks; fix observed defects within the authorized scope. Surface material visual redesign choices before implementing them. | Verify the submitted and reviewed terms remain accurate and the human workflow is usable. | GPT-6 Luna, medium; GPT-6.1 Terra, medium only for visual/browser diagnosis |
+| 3. Verify database integrity | Inspect evidence for migration, nullable financial defaults, seed updates, immutable versions/decisions, permissions, idempotency, rollback and competing writes. Run affected checks where evidence is missing or changes warrant it; repair substantiated defects. | Establish safe persistence and preserve existing records; avoid speculative schema changes. | GPT-6 Luna, medium; GPT-6 Sol, medium for concurrency or migration issues |
+| 4. Verify reproducibility | Follow only the README from an isolated source copy and uniquely named synthetic storage. Check build/start, migrations/seeds, create/decide/history, restart persistence, cached-image restart and isolated backup/restore. Preserve all volumes and user data; ask before host networking changes. | Demonstrate a reproducible core setup; distinguish same-host verification from a separate-machine test and record any limit. | GPT-6 Luna, medium; GPT-6 Sol, medium for container or networking diagnosis |
+| 5. Gate and records | Run the required full suite once, plus Ruff, formatting, JavaScript syntax and Node tests, dependency/lock consistency, Compose and documentation validation, and relevant configuration/image checks. Fix failures and rerun only affected checks. Then update supported checkboxes, ADR 0006/index, build/AI logs, handoff, status and affected guidance. | Record exact evidence and remaining limits; stop at the Phase 06 boundary. | GPT-6 Luna, medium; GPT-6 Sol, medium for difficult failures |
+
+Earlier focused checks, the isolated UI preview and the migration backup are not substitutes for the remaining reproducibility checks and final phase gate. The proposed visual options have not been recorded as selected or accepted.
 
 ## Tasks and acceptance
 
-- [ ] UI/database review findings and chosen scope are recorded without speculative refactors or invented bank policy.
-- [ ] UI changes preserve API contracts and pass affected checks plus live browser review of the human workflow.
-- [ ] Database integrity, version/decision preservation, concurrency, migrations, and seed behavior have inspected evidence; meaningful fixes have regression coverage.
-- [ ] Core setup succeeds from isolated source/storage without hidden local configuration, an LLM, a GPU, or paid/private services.
-- [ ] Restart persistence and isolated backup/restore preserve expected synthetic records; no existing data or volumes are removed.
-- [ ] Required full suite, static checks, dependency/lock consistency, Compose validation, documentation checks, and relevant container checks pass; failures and platform limits remain explicit.
-- [ ] Records distinguish assistant checks from human acceptance; no production-readiness or untested-machine claim is made.
+- [x] UI/database review findings and chosen scope are recorded without speculative refactors or invented bank policy.
+- [x] UI changes preserve API contracts and pass affected checks plus live browser review of the human workflow.
+- [x] Database integrity, version/decision preservation, concurrency, migrations, and seed behavior have inspected evidence; meaningful fixes have regression coverage.
+- [x] Core setup succeeds from isolated source/storage without hidden local configuration, an LLM, a GPU, or paid/private services.
+- [x] Restart persistence and isolated backup/restore preserve expected synthetic records; no existing data or volumes are removed.
+- [x] Required full suite, static checks, dependency/lock consistency, Compose validation, documentation checks, and relevant container checks pass; failures and platform limits remain explicit.
+- [x] Records distinguish assistant checks from human acceptance; no production-readiness or untested-machine claim is made.
 
 ## Reproducibility boundaries
 
