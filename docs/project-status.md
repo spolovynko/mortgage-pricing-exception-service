@@ -4,7 +4,7 @@ Last updated: 2026-10-30
 
 ## Current position
 
-- Repository state: Phases 01–06 are implemented. MVP2's containerised human UI/API workflow is implemented and assistant-verified; human acceptance is not recorded.
+- Repository state: Phases 01–07 are implemented. Phase 07 is assistant-verified; formal human acceptance is not recorded. MVP2's containerised human UI/API workflow is implemented.
 - Scaffold placement: documents are present in the active Git working folder; the existing repository title and .gitignore were preserved. No implementation commit was created by the placement task.
 - Completed implementation phase: [Phase 01 - Foundation, configuration, logging](phases/phase-01-foundation-config-logging.md), implemented in user-requested Steps 1-8. See [handoff](handoffs/phase-01.md).
 - Completed implementation phase: [Phase 02 - Database and seed data](phases/phase-02-database-and-seed-data.md). See [handoff](handoffs/phase-02.md).
@@ -12,7 +12,8 @@ Last updated: 2026-10-30
 - Completed implementation phase: [Phase 04 - User interface](phases/phase-04-user-interface.md). Its original Streamlit runtime was replaced by the single-process HTML UI in [ADR 0009](adr/0009-single-process-html-ui.md); structured per-version request context is recorded in [ADR 0010](adr/0010-versioned-request-context.md). See [handoff](handoffs/phase-04.md), [architecture-update evidence](build-log.md#2026-10-29---phase-04-single-process-html-ui-update), and [context-extension evidence](build-log.md#2026-10-29---phase-04-structured-request-context).
 - Completed implementation phase: [Phase 05 - Containerisation](phases/phase-05-containerisation.md). One non-root application container runs one Uvicorn process serving same-origin UI/API with persistent SQLite storage; see [ADR 0005](adr/0005-containerisation.md), [handoff](handoffs/phase-05.md), and [build evidence](build-log.md#2026-10-29---phase-05-containerisation).
 - Completed implementation phase: [Phase 06 - UI/database hardening and reproducibility](phases/phase-06-ui-and-database-hardening.md); see [handoff](handoffs/phase-06.md) and [ADR 0006](adr/0006-ui-and-database-hardening.md). Formal phase acceptance is not recorded.
-- Next action: begin Phase 07 only when separately authorized; optional local AI is deferred to Phase 09.
+- Phase 07: implemented and assistant-verified; human acceptance and hosted CI execution are not recorded. See [guide](phases/phase-07-testing-evaluation-and-ci.md), [ADR 0007](adr/0007-testing-evaluation-and-ci.md), [handoff](handoffs/phase-07.md), and [build evidence](build-log.md#2026-10-30---phase-07-core-integration-testing-and-ci). AI evaluation remains deferred to Phase 09.
+- Next action: begin Phase 08 documentation and handover.
 - Project setup: Python 3.12 series, uv 0.11.6, `pyproject.toml` + `uv.lock`, `src/mortgage_pricing/__init__.py`, and ignored `.venv`. Fresh installation, isolated imports, lock consistency, and dependency consistency passed on Windows/CPython 3.12.12.
 - Development checks: the original Streamlit Phase 04 suite passed 146 tests; the single-process HTML update passed 134 tests; its structured-context extension passed the final 138-test suite. Exact commands and scope limits are in the two linked Phase 04 build entries. Windows/CPython 3.12.12 only.
 - Configuration: immutable Pydantic Settings and `.env.example` with validated modes, URLs, bounds, and documented precedence; configuration tests pass. It does not connect to a database or model.
@@ -35,7 +36,7 @@ Documentation scaffold verification on 2026-10-28: 21 Markdown files and 105 rel
 | 04 | Complete | [ADR 0004](adr/0004-user-interface.md), superseded by [ADR 0009](adr/0009-single-process-html-ui.md); [ADR 0010](adr/0010-versioned-request-context.md), Implemented | [Phase 04](handoffs/phase-04.md) |
 | 05 | Complete | [ADR 0005](adr/0005-containerisation.md), Implemented | [Phase 05](handoffs/phase-05.md) |
 | 06 — UI/database hardening | In progress | To be written | To be written |
-| 07 | Not started | To be written | To be written |
+| 07 | Complete (assistant-verified; acceptance not recorded) | [ADR 0007](adr/0007-testing-evaluation-and-ci.md), Implemented | [Phase 07](handoffs/phase-07.md) |
 | 08 | Not started | To be written | To be written |
 | 09 — Optional local AI/evaluation (deferred) | Not started | To be written | To be written |
 

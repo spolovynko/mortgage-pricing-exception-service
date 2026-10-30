@@ -1,10 +1,10 @@
 # Phase 07 - Core integration testing and CI
 
-- Status: Not started.
+- Status: Complete; assistant verification complete. Formal human acceptance is not recorded.
 - Milestone: Core validation.
 - Prerequisite: prior phase outcomes inspected, including actual Phase 06 verification limits.
-- Primary ADR to create: `docs/adr/0007-testing-evaluation-and-ci.md`.
-- Handoff to create: `docs/handoffs/phase-07.md`.
+- Primary ADR: [0007](../adr/0007-testing-evaluation-and-ci.md).
+- Handoff: [Phase 07](../handoffs/phase-07.md).
 
 ## Objective
 
@@ -16,12 +16,12 @@ Consolidate evidence that the business workflow, polished UI, database, and core
 
 ## Implementation tasks
 
-- [ ] Map core acceptance scenarios to existing tests/manual evidence and fill meaningful gaps. Mark AI-specific AC-08/09 and the model portion of AC-10 as deferred to Phase 09 rather than passed.
-- [ ] Consolidate permission, self-review, idempotency replay/conflict, revision fidelity, competing writes, atomic history, and persistence regression cases.
-- [ ] Verify important UI interactions against the API contract, including reruns, retries, stale screens, and session-scoped AI choices.
-- [ ] Add repeatable core-container startup, persistence, and cached-image restart scenarios using isolated synthetic storage; preserve existing volumes.
-- [ ] Configure repository CI for install, lint/format checks, and ordinary automated tests. Keep routine checks independent of real model downloads, paid APIs, and private systems.
-- [ ] Keep live-model evaluation and resource-heavy container checks separately invoked and accurately labelled. Do not publish results or change remote settings without authorisation.
+- [x] Map core acceptance scenarios to existing tests/manual evidence. AI-specific AC-08/09 and the model portion of AC-10 remain deferred to Phase 09.
+- [x] Inspect existing permission, self-review, idempotency, revision, competing-write, atomic-history and persistence regression coverage; add no duplicate backend tests.
+- [x] Verify UI retry, stale-screen, API error, responsive width and keyboard focus behavior; correct application lookup fields in the Phase 03 API contract. There is no AI control in the current UI.
+- [x] Add `scripts/core-container-smoke.ps1` for isolated synthetic startup, create, approve, history, persistence and cached-image recreation. The uniquely named volume is deliberately preserved after Compose cleanup.
+- [x] Configure `.github/workflows/ci.yml` for locked install, Ruff, JavaScript syntax, Node UI tests and pytest; checks require no model or private service.
+- [x] Keep the resource-heavy container smoke separate from ordinary CI. AI evaluation remains deferred.
 
 ## Verification and evidence
 
@@ -31,11 +31,11 @@ Report actual core evidence and missing coverage; distinguish assistant review f
 
 ## Acceptance criteria
 
-- [ ] Every critical business guarantee has inspected test/scenario evidence.
-- [ ] Core tests and automated checks pass without a model or external network at test execution time.
-- [ ] Container persistence, core-only startup, and the human workflow without AI are exercised.
-- [ ] CI runs core checks without downloading models or requiring private systems.
-- [ ] Reports contain actual observations and clearly defer AI quality/judge claims to Phase 09.
+- [x] Every critical business guarantee has inspected test/scenario evidence.
+- [x] Core tests and automated checks pass without a model or external network at test execution time (dependency installation used configured package access).
+- [x] Container persistence, core-only startup, and the human workflow without AI are exercised.
+- [x] CI runs core checks without downloading models or requiring private systems; hosted CI itself has not yet run.
+- [x] Reports contain actual observations and clearly defer AI quality/judge claims to Phase 09.
 
 ## Decision record and handover
 

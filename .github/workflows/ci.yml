@@ -1,0 +1,27 @@
+name: Core CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: 0.11.6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: uv sync --locked --all-groups
+      - run: uv run --locked python -m ruff check .
+      - run: uv run --locked python -m ruff format --check .
+      - run: node --check ui/app.js
+      - run: node --check ui/workspace.js
+      - run: node --test tests/ui/workspace.test.cjs
+      - run: uv run --locked python -m pytest -q

@@ -20,7 +20,7 @@ Reserve these names for the primary phase records. Create the file during the ph
 | 04 | [0004-user-interface.md](0004-user-interface.md) | Superseded by ADR 0009; Phase 04 workflow complete |
 | 05 | [0005-containerisation.md](0005-containerisation.md) | Implemented; Phase 05 complete |
 | 06 | [0006-ui-and-database-hardening.md](0006-ui-and-database-hardening.md) | Implemented; Phase 06 complete |
-| 07 | `0007-testing-evaluation-and-ci.md` | Not created |
+| 07 | [0007-testing-evaluation-and-ci.md](0007-testing-evaluation-and-ci.md) | Implemented; Phase 07 assistant-verified |
 | 08 | `0008-documentation-and-handover.md` | Not created |
 | 09 | `0011-local-llm-integration.md` | Deferred; not created (0009/0010 already exist) |
 

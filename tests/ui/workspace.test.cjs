@@ -98,6 +98,49 @@ test("editing a draft preserves the original pending creation key and payload", 
   assert.equal(page.calls(), 0);
 });
 
+test("retrying a failed create reuses the original idempotency key and payload", async () => {
+  const page = workspace();
+  const attempts = [];
+  page.run('state.requests = [];');
+  page.context.fetch = async (_path, options) => {
+    attempts.push({ path: _path, method: options.method, key: options.headers["Idempotency-Key"], body: options.body });
+    if (attempts.length === 1) throw new Error("synthetic connection failure");
+    const body = _path === "/requests" && options.method === "POST"
+      ? { request_id: "request-a", version_number: 1, replayed: true }
+      : _path === "/requests" ? []
+        : _path === "/demo/applications" ? []
+          : _path === "/requests/request-a" ? { request_id: "request-a", application_id: "app-a" }
+            : { application_id: "app-a", status: "none" };
+    return { ok: true, headers: { get: () => "retry-correlation" }, json: async () => body };
+  };
+  page.context.testForm = form();
+  await page.run("submitCreate(testForm)");
+  const pending = page.run("JSON.stringify(getCreateIntent())");
+  assert.match(page.app.innerHTML, /Retry submission/);
+  await page.run('handleWorkspaceClick({ target: { closest: () => ({ dataset: { action: "retry-create" } }) } })');
+  const submissions = attempts.filter((attempt) => attempt.path === "/requests" && attempt.method === "POST");
+  assert.equal(submissions.length, 2);
+  assert.equal(submissions[0].key, submissions[1].key);
+  assert.equal(submissions[0].body, submissions[1].body);
+  assert.notEqual(page.run("JSON.stringify(getCreateIntent())"), pending);
+});
+
+test("a stale review displays refresh without submitting another decision", async () => {
+  const page = workspace();
+  const calls = [];
+  page.run('state.reviewDetail = { request_id: "request-a", current_version: { version_number: 1 } };');
+  page.context.fetch = async (path, options) => {
+    calls.push({ path, body: JSON.parse(options.body) });
+    return { ok: false, status: 409, headers: { get: () => "stale-correlation" },
+      json: async () => ({ error: { code: "stale_version", message: "Refresh the request." } }) };
+  };
+  await page.run('decide("approved")');
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].body.expected_version, 1);
+  assert.match(page.app.innerHTML, /Refresh request/);
+  assert.equal(page.run('state.reviewDetail.current_version.version_number'), 1);
+});
+
 test("an existing request blocks duplicate creation without silently retargeting a saved draft", () => {
   const page = workspace();
   page.context.testForm = form();

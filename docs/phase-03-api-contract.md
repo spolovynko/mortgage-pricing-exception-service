@@ -8,7 +8,7 @@ Discounts must fit SQLite's positive signed 64-bit range (1–9,223,372,036,854,
 
 `DEMO_IDENTITY_MODE=header` enables the non-authenticating `X-Demo-User: ada.manager` login header. The default `off` mode disables business endpoints. A missing or unknown login receives 401; a user without manager or reviewer membership receives 403. Both internal roles may read requests, history, approved pricing, and demo lookups. Only the owning relationship manager may create or revise; only a reviewer other than the owner and submitter may decide. The server resolves actor and time; decision bodies cannot supply either. This mode is for local demonstration, not production authentication.
 
-`GET /demo/users` returns sorted `{id,login,display_name,roles}` records. `GET /demo/applications` returns sorted `{id,reference,manager_id}` records. Both require a demo identity. These are lookup lists, not user management.
+`GET /demo/users` returns sorted `{id,login,display_name,roles}` records. `GET /demo/applications` returns sorted `{id,reference,manager_id,loan_amount,property_value,standard_rate_bps,term_months}` records; the four financial fields are nullable. Both require a demo identity. These are lookup lists, not user management.
 
 ## Business routes
 

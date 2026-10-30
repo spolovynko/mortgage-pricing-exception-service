@@ -206,3 +206,7 @@ If the model cannot be downloaded or tested, record that limitation. Do not subs
 ## 2026-10-30 - Phase 06 UI, database and reproducibility
 
 Codex implemented and reviewed the workspace, demo-data and migration changes, executed tests and isolated reproduction, and prepared phase records; the user operated live request decisions and considered UI Step 2 done. Assistant verification is not formal phase acceptance. See [build evidence](build-log.md#2026-10-30---phase-06-ui-database-and-reproducibility) for results and limits. No subagents, paid API or model runtime were used.
+
+## 2026-10-30 - Phase 07 core integration testing and CI
+
+Codex inspected existing coverage, added focused retry/stale UI regressions, updated the lookup contract, and configured ordinary CI plus a separately invoked isolated container smoke. Verification was assistant-run, including a live local browser and synthetic container; the hosted workflow and formal human acceptance remain unverified. Exact commands and limits: [Phase 07 build entry](build-log.md#2026-10-30---phase-07-core-integration-testing-and-ci). No subagents, paid API, model runtime or dependency changes.
