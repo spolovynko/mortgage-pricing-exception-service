@@ -4,7 +4,7 @@ Last updated: 2026-10-30
 
 ## Current position
 
-- Repository state: Phases 01–07 are implemented. Phase 07 is assistant-verified; formal human acceptance is not recorded. MVP2's containerised human UI/API workflow is implemented.
+- Repository state: Phases 01–08 are implemented and assistant-verified; formal human acceptance is not recorded. Phase 08 verified a fresh copy on the same Windows/Docker host. Second-machine setup, offline first build, hosted CI, and AI/model behavior remain unverified or deferred.
 - Scaffold placement: documents are present in the active Git working folder; the existing repository title and .gitignore were preserved. No implementation commit was created by the placement task.
 - Completed implementation phase: [Phase 01 - Foundation, configuration, logging](phases/phase-01-foundation-config-logging.md), implemented in user-requested Steps 1-8. See [handoff](handoffs/phase-01.md).
 - Completed implementation phase: [Phase 02 - Database and seed data](phases/phase-02-database-and-seed-data.md). See [handoff](handoffs/phase-02.md).
@@ -13,7 +13,8 @@ Last updated: 2026-10-30
 - Completed implementation phase: [Phase 05 - Containerisation](phases/phase-05-containerisation.md). One non-root application container runs one Uvicorn process serving same-origin UI/API with persistent SQLite storage; see [ADR 0005](adr/0005-containerisation.md), [handoff](handoffs/phase-05.md), and [build evidence](build-log.md#2026-10-29---phase-05-containerisation).
 - Completed implementation phase: [Phase 06 - UI/database hardening and reproducibility](phases/phase-06-ui-and-database-hardening.md); see [handoff](handoffs/phase-06.md) and [ADR 0006](adr/0006-ui-and-database-hardening.md). Formal phase acceptance is not recorded.
 - Phase 07: implemented and assistant-verified; human acceptance and hosted CI execution are not recorded. See [guide](phases/phase-07-testing-evaluation-and-ci.md), [ADR 0007](adr/0007-testing-evaluation-and-ci.md), [handoff](handoffs/phase-07.md), and [build evidence](build-log.md#2026-10-30---phase-07-core-integration-testing-and-ci). AI evaluation remains deferred to Phase 09.
-- Next action: begin Phase 08 documentation and handover.
+- Phase 08: implemented and assistant-verified; human acceptance is not recorded. Same-host fresh-copy setup and core human workflow passed. See [guide](phases/phase-08-documentation-and-handover.md), [ADR 0008](adr/0008-documentation-and-handover.md), [handoff](handoffs/phase-08.md), and [build evidence](build-log.md#2026-10-30---phase-08-documentation-demonstration-and-handover). A previous screenshot attempt may have applied migrations/seeds to the existing workspace database; see the build entry for the incident and limits.
+- Next action: Phase 09 optional local LLM integration and evaluation, only when separately authorized.
 - Project setup: Python 3.12 series, uv 0.11.6, `pyproject.toml` + `uv.lock`, `src/mortgage_pricing/__init__.py`, and ignored `.venv`. Fresh installation, isolated imports, lock consistency, and dependency consistency passed on Windows/CPython 3.12.12.
 - Development checks: the original Streamlit Phase 04 suite passed 146 tests; the single-process HTML update passed 134 tests; its structured-context extension passed the final 138-test suite. Exact commands and scope limits are in the two linked Phase 04 build entries. Windows/CPython 3.12.12 only.
 - Configuration: immutable Pydantic Settings and `.env.example` with validated modes, URLs, bounds, and documented precedence; configuration tests pass. It does not connect to a database or model.
@@ -35,9 +36,9 @@ Documentation scaffold verification on 2026-10-28: 21 Markdown files and 105 rel
 | 03 | Complete | [ADR 0003](adr/0003-business-rules-and-api.md), Implemented | [Phase 03](handoffs/phase-03.md) |
 | 04 | Complete | [ADR 0004](adr/0004-user-interface.md), superseded by [ADR 0009](adr/0009-single-process-html-ui.md); [ADR 0010](adr/0010-versioned-request-context.md), Implemented | [Phase 04](handoffs/phase-04.md) |
 | 05 | Complete | [ADR 0005](adr/0005-containerisation.md), Implemented | [Phase 05](handoffs/phase-05.md) |
-| 06 — UI/database hardening | In progress | To be written | To be written |
+| 06 — UI/database hardening | Complete (assistant-verified; acceptance not recorded) | [ADR 0006](adr/0006-ui-and-database-hardening.md) | [Phase 06](handoffs/phase-06.md) |
 | 07 | Complete (assistant-verified; acceptance not recorded) | [ADR 0007](adr/0007-testing-evaluation-and-ci.md), Implemented | [Phase 07](handoffs/phase-07.md) |
-| 08 | Not started | To be written | To be written |
+| 08 | Complete (assistant-verified; acceptance not recorded) | [ADR 0008](adr/0008-documentation-and-handover.md), Implemented | [Phase 08](handoffs/phase-08.md) |
 | 09 — Optional local AI/evaluation (deferred) | Not started | To be written | To be written |
 
 Allowed phase states: Not started, In progress, Complete, or Incomplete - needs follow-up. Describe any impediment in plain language. Completion must be backed by the guide's acceptance evidence.
@@ -68,4 +69,4 @@ The proposed business policy is in [requirements.md](requirements.md). Record an
 
 ## Next chat
 
-Begin Phase 07 when authorized, using the Phase 06 handoff; do not assume formal phase acceptance. Phases 07 and 08 cover core validation/CI and handover; Phase 09 contains deferred optional AI and evaluation. Core startup stays independent of model setup. Active work time is not recorded. No assistant commit or push.
+Begin Phase 09 only when authorized, using the Phase 08 handoff. Core startup remains independent of model setup. Phase 08 active work time is not recorded; formal human acceptance is not recorded. Same-host Windows/Docker verification only; hosted CI, second-machine setup, and offline first build remain unverified. No assistant commit or push.

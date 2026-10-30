@@ -98,6 +98,8 @@ docker compose up --build --detach --wait
 
 Then open <http://127.0.0.1:8080/>. Startup applies database migrations and ensures the fictional demo records exist. Core mode runs without AI.
 
+To stop a Compose run while keeping its database, use `docker compose down`; restart it with `docker compose up --detach --wait`. For the local Python option, press Ctrl+C in the server terminal. The separate [troubleshooting and local-data guide](docs/troubleshooting.md) explains persistence and the destructive reset command.
+
 ### Use the application
 
 **Submit a request.** As Manager, choose **New request**, select an application, check its mortgage details, enter a discount and reason, then select **Submit for review**. Required fields are marked in the form. Use fictional, non-identifying information only.
@@ -156,3 +158,5 @@ For a basic demo, no `.env` file is required. Keep the container’s database pa
 - **Data:** SQLite with SQLAlchemy and Alembic migrations.
 - **Runtime options:** Docker Compose, or Python and uv for running locally without Docker.
 - **Tests:** pytest for Python behavior and Node’s test runner for JavaScript behavior.
+
+See the [demo walkthrough](docs/demo.md) for detailed scenarios and [production considerations](docs/production-notes.md) for deployment follow-ups.

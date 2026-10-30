@@ -21,7 +21,7 @@ Reserve these names for the primary phase records. Create the file during the ph
 | 05 | [0005-containerisation.md](0005-containerisation.md) | Implemented; Phase 05 complete |
 | 06 | [0006-ui-and-database-hardening.md](0006-ui-and-database-hardening.md) | Implemented; Phase 06 complete |
 | 07 | [0007-testing-evaluation-and-ci.md](0007-testing-evaluation-and-ci.md) | Implemented; Phase 07 assistant-verified |
-| 08 | `0008-documentation-and-handover.md` | Not created |
+| 08 | [0008-documentation-and-handover.md](0008-documentation-and-handover.md) | Implemented; Phase 08 same-host verification recorded |
 | 09 | `0011-local-llm-integration.md` | Deferred; not created (0009/0010 already exist) |
 
 Additional ADRs use the next free number after the primary phase records and identify their phase in the record. Numbering is an index, not a substitute for the actual creation date.

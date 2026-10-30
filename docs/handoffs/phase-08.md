@@ -1,0 +1,11 @@
+# Phase 08 handoff - Documentation, demonstration, and handover
+
+- Date: 2026-10-30 (Europe/Brussels). Status: Implemented and assistant-verified; formal human acceptance is not recorded.
+- Git: branch `main`, base HEAD `a75d7af`; Phase 08 work is uncommitted. No assistant commit, push, deployment, or PR.
+- Read first: [README](../../README.md), [demo](../demo.md), [troubleshooting](../troubleshooting.md), [production notes](../production-notes.md), [ADR 0008](../adr/0008-documentation-and-handover.md), and [verification](../build-log.md#2026-10-30---phase-08-documentation-demonstration-and-handover).
+- Implemented contract: one Compose application service with `LLM_MODE=off`, or local Python 3.12/uv startup. Two fictional users (`ada.manager`, `blake.reviewer`) and ten synthetic applications are seeded, including `SYN-MORTGAGE-DEMO-CLEAN`. Manager and reviewer decisions remain human-controlled; demo header identity is not authentication. Model integration/evaluation is deferred to Phase 09.
+- Verification: fresh-copy Python and Compose setup, 155 Python tests, 8 Node tests, static/dependency checks, UI/API readiness, synthetic browser submit/approval, API retry/approval/retrieval/revision/decline/history, cached-image recreation, ordinary logs, bounded 404, Markdown links/fences, tracked-artifact scan, and diff check passed. Detailed commands/results are in the build entry.
+- Limits: same Windows/Docker host only; image/dependency cache existed. No second-machine, offline first build, minimum resource, hosted CI, AI/model, or judge results are claimed. Active work time is not recorded.
+- Incident: an early screenshot run used the workspace default database before isolation. Migrations/seeds may have modified `data/mortgage_pricing.db`; it was not deleted, but the prior state and modification extent are unknown. A workspace `uv sync --locked` changed `.venv` by removing packages outside the project lock. Later screenshot and E2E checks used separate temporary/synthetic storage. Preserve the recorded uncertainty.
+- Records updated: phase guide/checklist, ADR 0008/index, build log, AI-use log, project status, README, demo/troubleshooting/production docs.
+- Next: begin Phase 09 only after separate authorization.
