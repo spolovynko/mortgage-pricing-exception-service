@@ -25,6 +25,8 @@ const state = {
   notice: null,
   revisionDraft: null,
   busy: false,
+  aiEnabled: sessionStorage.getItem("aiEnabled") === "true",
+  assessment: null,
 };
 
 const applicationFinancialFields = ["loan_amount", "property_value", "standard_rate_bps", "term_months"];
@@ -337,6 +339,10 @@ async function loadRequest(requestId, target = "detail") {
   try {
     const detail = await api(`/requests/${encodeURIComponent(requestId)}`);
     if (target === "review") {
+      if (state.reviewDetail?.request_id !== requestId
+          || state.reviewDetail?.current_version.version_number !== detail.current_version.version_number) {
+        state.assessment = null;
+      }
       state.selectedReviewId = requestId;
       state.reviewDetail = detail;
     } else {
@@ -626,6 +632,28 @@ async function handleWorkspaceClick(event) {
     state.createApplicationId = "";
     state.notice = { kind: "success", message: "Draft discarded. Saved requests are unchanged." };
     render({ focusHeading: true });
+  } else if (button.dataset.action === "ai-toggle") {
+    state.aiEnabled = !state.aiEnabled;
+    state.assessment = null;
+    sessionStorage.setItem("aiEnabled", String(state.aiEnabled));
+    render();
+  } else if (button.dataset.action === "generate-assessment") {
+    if (!state.aiEnabled || !state.reviewDetail) return;
+    state.busy = true;
+    state.assessment = null;
+    render();
+    try {
+      state.assessment = await api(`/requests/${state.reviewDetail.request_id}/assessments`, {
+        method: "POST", body: { expected_version: state.reviewDetail.current_version.version_number },
+      });
+    } catch (error) {
+      state.notice = { kind: "error", message: error instanceof ApiError && error.code === "ai_disabled"
+        ? "Optional AI assistance is not enabled on this service. Continue the human review."
+        : "AI assistance is unavailable. Continue the human review." };
+    } finally {
+      state.busy = false;
+      render();
+    }
   } else if (button.dataset.action === "decide") {
     await decide(button.dataset.outcome);
   } else if (button.dataset.action === "fill-synthetic") {

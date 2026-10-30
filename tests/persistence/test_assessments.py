@@ -20,9 +20,11 @@ from tests.persistence.test_operations import prepare
 
 @pytest.fixture
 def sessions(tmp_path: Path) -> Iterator[sessionmaker[Session]]:
-    engine = create_database_engine(Settings(
-        _env_file=None, database_url=f"sqlite:///{(tmp_path / 'assessments.db').as_posix()}"
-    ))
+    engine = create_database_engine(
+        Settings(
+            _env_file=None, database_url=f"sqlite:///{(tmp_path / 'assessments.db').as_posix()}"
+        )
+    )
     Base.metadata.create_all(engine)
     try:
         yield create_session_factory(engine)

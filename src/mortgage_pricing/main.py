@@ -13,6 +13,7 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from starlette.responses import HTMLResponse, JSONResponse
 from starlette.staticfiles import StaticFiles
 
+from mortgage_pricing.api.assessments import router as assessments_router
 from mortgage_pricing.api.errors import error_response, register_error_handlers
 from mortgage_pricing.api.foundation import DemoError, demo_error_handler
 from mortgage_pricing.api.foundation import router as demo_router
@@ -110,6 +111,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(reads_router)
     app.include_router(workflow_router)
     app.include_router(pricing_router)
+    app.include_router(assessments_router)
 
     @app.get("/", include_in_schema=False)
     def user_interface() -> HTMLResponse:
