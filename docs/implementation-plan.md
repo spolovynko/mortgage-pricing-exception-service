@@ -1,8 +1,8 @@
 # Implementation plan
 
-Status: Phases 01–03 are complete; MVP1 is implemented and verified. Phase 04 is next and has not started. See [project status](project-status.md) and the [Phase 03 handoff](handoffs/phase-03.md).
+Status: Phases 01–05 are implemented and assistant-verified; human acceptance is not recorded. Phase 06 now focuses on UI/database hardening and reproducibility. Optional local AI is deferred to the final Phase 09 by the user on 2026-10-30. See [project status](project-status.md).
 
-This plan implements the requirements and the user's agreed additions: a Python UI, optional local AI, automatic model setup, operational logging, central configuration, and one application Dockerfile with one Compose file.
+This plan implements the requirements and the user's agreed additions: a same-origin HTML/CSS/JavaScript UI, optional local AI, automatic model setup, operational logging, central configuration, and one application Dockerfile with one Compose file.
 
 ## Phase sequence
 
@@ -13,9 +13,10 @@ This plan implements the requirements and the user's agreed additions: a Python 
 | 03 | [Business rules and API](phases/phase-03-business-rules-and-api.md) | MVP1 | Complete tested human approval workflow through HTTP |
 | 04 | [User interface](phases/phase-04-user-interface.md) | MVP2 | Request, review, revision, history, and AI-control screens |
 | 05 | [Containerisation](phases/phase-05-containerisation.md) | MVP2 | Core UI/API startup through one Compose command |
-| 06 | [Local LLM integration](phases/phase-06-local-llm-integration.md) | MVP3 | Optional real model, cached automatic setup, advisory assessments |
-| 07 | [Testing, evaluation, CI](phases/phase-07-testing-evaluation-and-ci.md) | MVP3 | Integrated evidence, AI evaluation and judge calibration, automated checks |
-| 08 | [Documentation and handover](phases/phase-08-documentation-and-handover.md) | MVP3 | Verified fresh setup, demonstration, honest limitations and submission record |
+| 06 | [UI and database hardening](phases/phase-06-ui-and-database-hardening.md) | MVP2 hardening | Polished human workflow, reviewed database integrity, reproducible core setup |
+| 07 | [Integration testing and CI](phases/phase-07-testing-evaluation-and-ci.md) | Core validation | Integrated business/UI/container evidence and automated checks without a model |
+| 08 | [Documentation and handover](phases/phase-08-documentation-and-handover.md) | Core handover | Verified fresh setup, demonstration, honest limitations and submission record |
+| 09 | [Optional local LLM integration and AI evaluation](phases/phase-09-local-llm-integration.md) | Optional MVP3 | Cached model setup, advisory assessments, live evaluation and any judge calibration |
 
 Phases are sequential for this project. A phase can prepare an interface for a later feature, but it must identify unavailable functionality clearly. Tests, logging, ADRs, build records, AI-use notes, and documentation are maintained throughout; they are not deferred to Phase 07 or 08.
 
@@ -23,9 +24,9 @@ Phases are sequential for this project. A phase can prepare an interface for a l
 
 - **MVP1:** API-level create, inspect, revise, decide, history, and approved-discount retrieval work with seed data. Critical permission, retry, and competing-update cases are tested.
 - **MVP2:** A reviewer can use the complete human workflow through the containerised UI. One application container runs one Uvicorn process serving both UI and API, per the user's 2026-10-29 requirement change. Application data survives restarts.
-- **MVP3:** Optional local AI is automatically prepared and evaluated. Human approval works with assistance on, off, or unavailable. The final documentation and reproducibility checks are complete.
+- **MVP3 (optional, Phase 09):** Optional local AI is automatically prepared and evaluated. Human approval works with assistance on, off, or unavailable. The final documentation and reproducibility checks are complete.
 
-MVP2 and MVP3 are delivery labels for this exercise, not claims of production maturity. The PDF treats a custom UI and an additional AI demonstration as bonuses; both are included in this project's agreed plan.
+MVP2 and MVP3 are delivery labels for this exercise, not claims of production maturity. The PDF treats a custom UI and an additional AI demonstration as bonuses; the UI is implemented and the additional live AI demonstration is deferred to the final optional phase.
 
 ## One chat per phase
 

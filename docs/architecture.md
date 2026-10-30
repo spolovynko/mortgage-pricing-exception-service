@@ -1,6 +1,6 @@
 # Proposed architecture
 
-Status: Phases 01-04 are complete. The human UI/API workflow is implemented; container delivery and model integration remain later phases. Use ADRs for rationale.
+Status: Phases 01-05 are implemented and assistant-verified. Phase 06 now covers UI/database hardening; optional model integration and AI evaluation are deferred to final Phase 09. Use ADRs for rationale.
 
 Phase 01 completed (2026-10-29): packaging, Python 3.12/uv setup, configuration, `/health`, request tracing, and safe error responses are implemented and verified with a fresh environment and 48 passing tests.
 
@@ -30,7 +30,7 @@ flowchart TD
 
 ## Source layout
 
-Implemented modules are grouped by responsibility; the `ai/` and model-init entries remain Phase 06 plans:
+Implemented modules are grouped by responsibility; the `ai/` and model-init entries remain Phase 09 plans:
 
 ```text
 src/mortgage_pricing/
@@ -83,7 +83,7 @@ Phase 03 implements create/list/inspect, submit revision, decide an exact versio
 
 ## Application container and Compose
 
-Maintain **one application Dockerfile** and **one compose.yaml**. Per the user's 2026-10-29 requirement change, one core application service runs one Uvicorn process serving both UI assets and the HTTP API. No separate UI container or reverse proxy is required. A future Python model-init job may reuse the application image; Ollama uses a pinned official image in Phase 06. The model weights are not baked into the application image or committed to Git.
+Maintain **one application Dockerfile** and **one compose.yaml**. Per the user's 2026-10-29 requirement change, one core application service runs one Uvicorn process serving both UI assets and the HTTP API. No separate UI container or reverse proxy is required. A future Python model-init job may reuse the application image; Ollama uses a pinned official image in Phase 09. The model weights are not baked into the application image or committed to Git.
 
 The browser connects directly to the application's host-loopback port. FastAPI serves HTML, CSS, JavaScript, and API routes from the same origin, preserving ADR 0009's single-process runtime and existing HTTP contracts without forwarding or CORS changes. The backend calls `http://ollama:11434` when that future service exists. Container `localhost` refers to that container, not another service. Keep Ollama internal to the Compose network unless a documented local debugging need requires otherwise. See the [updated container requirement](requirements.md#project-additions-selected-by-the-user).
 
@@ -91,7 +91,7 @@ Phase 05 implements this as a digest-pinned, multi-stage Python 3.12.12 image wi
 
 The container entrypoint validates file-backed writable SQLite storage, upgrades to Alembic head, inserts only missing fixed synthetic seeds, and then replaces itself with Uvicorn. Preparation failures stop the service before business operations are exposed. `/ready` verifies the current schema and a rollback-only write; `/health` remains process liveness. Core startup sets `LLM_MODE=off` and has no model dependency. See [ADR 0005](adr/0005-containerisation.md).
 
-The named volume preserves business data across normal container recreation; a separate model-cache volume belongs to later AI work. The combined application is the sole core service. Future Ollama/model-init belong to Phase 06 and must not make core startup depend on successful model setup.
+The named volume preserves business data across normal container recreation; a separate model-cache volume belongs to later AI work. The combined application is the sole core service. Future Ollama/model-init belong to Phase 09 and must not make core startup depend on successful model setup.
 
 ## Configuration and AI controls
 
@@ -103,7 +103,7 @@ There are three independent facts:
 2. Whether the runtime and selected model are ready.
 3. Whether the current reviewer has chosen assistance and explicitly requested generation.
 
-The UI toggle is local to the reviewer's session. Off prevents new calls and does not delete assessments, stop the runtime, or silently cancel a call already in flight. A Generate button initiates a call. Check current version again when returning/storing a result; preserve or reject stale results according to the Phase 06 ADR, and never present them as current advice.
+The UI toggle is local to the reviewer's session. Off prevents new calls and does not delete assessments, stop the runtime, or silently cancel a call already in flight. A Generate button initiates a call. Check current version again when returning/storing a result; preserve or reject stale results according to the Phase 09 ADR, and never present them as current advice.
 
 ## Observability and failures
 

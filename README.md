@@ -6,7 +6,7 @@ A Python service for managing mortgage rate discount requests, reviewer decision
 
 Phase 01 is complete: installable Python package, locked development tools, validated configuration, health API, structured request logging, and safe correlated error responses. Its fresh-install verification passed on Windows/CPython 3.12.12 with **48 tests passing**. See the [Phase 01 handoff](docs/handoffs/phase-01.md).
 
-Phases 02–04 are complete. SQLite persistence, synthetic seeds, the human approval API, and a minimal HTML/CSS/JavaScript UI for requests, review, and history are available from one Uvicorn process. `/health` reports process liveness and `/ready` checks migrated storage. The UI uses same-origin HTTP only; demo identities are simulated and assessment generation remains unavailable until Phase 06. See the [Phase 03 contract](docs/phase-03-api-contract.md), [ADR 0003](docs/adr/0003-business-rules-and-api.md), [ADR 0009](docs/adr/0009-single-process-html-ui.md), and [Phase 04 handoff](docs/handoffs/phase-04.md). Containers and model integration remain later-phase work.
+Phases 02–05 are implemented and assistant-verified; human acceptance is not recorded. SQLite persistence, synthetic seeds, the human approval API, and a minimal HTML/CSS/JavaScript UI for requests, review, and history are available from one Uvicorn process. `/health` reports process liveness and `/ready` checks migrated storage. The UI uses same-origin HTTP only; demo identities are simulated and assessment generation is deferred to optional Phase 09. See the [Phase 03 contract](docs/phase-03-api-contract.md), [ADR 0003](docs/adr/0003-business-rules-and-api.md), [ADR 0009](docs/adr/0009-single-process-html-ui.md), and [Phase 04 handoff](docs/handoffs/phase-04.md). Core container startup is implemented; optional model integration is deferred. Phase 06 now covers [UI/database hardening and reproducibility](docs/phases/phase-06-ui-and-database-hardening.md); see the [revised roadmap](docs/implementation-plan.md).
 
 The service manages a pricing exception for an existing mortgage application. A human reviewer approves or declines the discount. Mortgage underwriting and credit approval are outside scope.
 
@@ -126,7 +126,7 @@ $env:DEMO_IDENTITY_MODE = "header"
 uv run --locked uvicorn mortgage_pricing.main:create_app --factory --host 127.0.0.1 --port 8000 --log-config config/logging.json --no-access-log
 ```
 
-Open `http://127.0.0.1:8000/`. FastAPI serves separate `ui/index.html`, `ui/styles.css`, and `ui/app.js` files; browser requests use same-origin API routes. The interface selects fictional demo identities and offers Requests, Review (reviewers only), and History. Writes require explicit actions; AI assistance is a session preference and assessment generation is disabled until Phase 06. See [ADR 0009](docs/adr/0009-single-process-html-ui.md), the [Phase 04 guide](docs/phases/phase-04-user-interface.md), and the [handoff](docs/handoffs/phase-04.md).
+Open `http://127.0.0.1:8000/`. FastAPI serves separate `ui/index.html`, `ui/styles.css`, and `ui/app.js` files; browser requests use same-origin API routes. The interface selects fictional demo identities and offers Requests, Review (reviewers only), and History. Writes require explicit actions; AI assistance is a session preference and assessment generation is disabled pending optional Phase 09. See [ADR 0009](docs/adr/0009-single-process-html-ui.md), the [Phase 04 guide](docs/phases/phase-04-user-interface.md), and the [handoff](docs/handoffs/phase-04.md).
 
 Each new request version records structured mortgage context (purpose, rate type, loan/property values with currency, term, and standard rate) alongside a free-text reason and reason category. Competitor offer details are optional and labelled manager-reported/unverified. The form includes synthetic example presets that prefill editable fields; they do not save until Submit. No borrower-identifying or creditworthiness data is requested. Context is versioned and returned in details/history for future assistance; see [ADR 0010](docs/adr/0010-versioned-request-context.md) and the [API contract](docs/phase-03-api-contract.md).
 
@@ -182,7 +182,7 @@ Change the phase number and guide for each subsequent chat. Use the same reposit
 
 ## Stack
 
-Python, FastAPI/Uvicorn, Pydantic Settings, SQLAlchemy, SQLite, Alembic, plain HTML/CSS/JavaScript, pytest, and one Docker Compose application service. One non-root Uvicorn process serves UI and API through the same host-loopback port. Optional Ollama/model-initialisation services remain Phase 06 work. See [ADR 0005](docs/adr/0005-containerisation.md).
+Python, FastAPI/Uvicorn, Pydantic Settings, SQLAlchemy, SQLite, Alembic, plain HTML/CSS/JavaScript, pytest, and one Docker Compose application service. One non-root Uvicorn process serves UI and API through the same host-loopback port. Optional Ollama/model-initialisation services remain optional Phase 09 work. See [ADR 0005](docs/adr/0005-containerisation.md).
 
 ## Container startup and operations
 
@@ -208,7 +208,13 @@ Normal `docker compose down` removes the container and network but preserves the
 
 If port 8000 is occupied, set another loopback port before startup: PowerShell `$env:APP_PORT = "8010"`; POSIX shell `APP_PORT=8010 docker compose up --build`. Check liveness at `/health` and migrated writable database readiness at `/ready`. Configuration failures and migration/seed failures stop startup and appear in `docker compose logs app`. Container logs use bounded local retention (three 10 MB files).
 
-Docker with Compose and internet access are required for the first image/dependency download. Cached restarts can work offline. The optional model candidate remains Phase 06 work; no model readiness is claimed here.
+Docker with Compose and internet access are required for the first image/dependency download. Cached restarts can work offline. The optional model candidate remains optional Phase 09 work; no model readiness is claimed here.
+
+### Reproducing the project elsewhere
+
+The source repository supplies the Dockerfile, Compose configuration, dependency lockfile, migrations, synthetic seed definitions, and configuration examples. Another evaluator should build/start core mode with the command above; startup creates their own database rather than requiring a copy of the developer's data. Phase 06 will exercise README-only setup from isolated source/storage. Existing Phase 05 checks were on Windows/WSL2 Docker Desktop; an actual second-machine or different-architecture result is not yet recorded.
+
+Optional Phase 09 will add a pinned Ollama runtime and a model-init job that downloads and verifies the selected model into a persistent cache. These services do not exist yet. Model weights belong in that runtime cache, outside Git and the application image; the repository will carry model identity/digest, licence information, configuration, and setup code. Ollama documents [container-backed persistent storage](https://docs.ollama.com/docker) and its [model download API](https://docs.ollama.com/api/pull). First-time setup requires network access unless the necessary images, packages, and licensed model artefacts are supplied separately. Cached offline operation must be tested before it is claimed.
 
 ## Submission notes
 

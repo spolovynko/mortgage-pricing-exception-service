@@ -1,10 +1,11 @@
-# Phase 06 - Optional local LLM integration
+# Phase 09 - Optional local LLM integration and AI evaluation
 
 - Status: Not started.
 - Milestone: MVP3.
-- Prerequisite: Phase 05 core container workflow verified.
-- Primary ADR to create: `docs/adr/0006-local-llm-integration.md`.
-- Handoff to create: `docs/handoffs/phase-06.md`.
+- Prerequisite: Phases 06-08 core hardening, testing, and handover outcomes inspected.
+- Primary ADR to create: `docs/adr/0011-local-llm-integration.md` (0009 and 0010 already exist).
+- Handoff to create: `docs/handoffs/phase-09.md`.
+- Scheduling: deferred to the final optional phase by the user on 2026-10-30; no integration work has started.
 
 ## Objective
 
@@ -18,7 +19,7 @@ Add a narrowly defined, real local AI assistant and automatic model setup. Prese
 
 The live assistant summarises the exact submitted version and flags information missing under a written exercise checklist. It distinguishes reported claims from verified facts. It does not grant a discount, change a status, invent lending policy, or verify outside evidence.
 
-An LLM judge that grades summaries is a separate evaluation component developed/calibrated in Phase 07. Do not conflate that score with approval authority.
+An LLM judge that grades summaries is a separate evaluation component, deferred here from Phase 07. It can be evaluated only after live assessment generation exists. Do not conflate that score with approval authority.
 
 ## Implementation tasks
 
@@ -64,8 +65,16 @@ Do not force registry updates or downloads when the required cached artefact is 
 - [ ] Assessment/version metadata and model failures are handled correctly without partial approvals.
 - [ ] Runtime, licence, model, hardware, and live-test evidence are recorded honestly. Untested items remain unchecked.
 
+## Deferred AI evaluation
+
+- [ ] Define a versioned synthetic evaluation set and rubric before measuring live output: faithfulness, unsupported claims, exact request/discount identity, useful checklist findings, and evidence limits. Include omissions, ambiguity, adversarial text, and generation failures.
+- [ ] Obtain actual human review/labels; agent-generated labels remain provisional. Do not claim calibration without human-labelled evidence.
+- [ ] Add an explicitly invoked live evaluation runner and report with model/runtime/prompt/settings/hardware, dataset size, measured latency, repeated-run consistency, failures, and limitations.
+- [ ] If an optional LLM judge is added, compare it with human labels and report false passes/disagreements separately from generation defects. It must never gate approval.
+- [ ] Keep ordinary tests independent of model downloads/network access. Record unmet evaluation prerequisites honestly and refresh Phase 08 setup/demo guidance after integration.
+
 ## Decision record and handover
 
 Explain model selection based on observed task evidence, resource trade-offs, prompt/schema design, stale-result handling, timeout/retry limits, readiness, and cache strategy. Update this guide, architecture, the ADR index, [build log](../build-log.md), [AI usage](../ai-usage.md), and [project status](../project-status.md); write the handoff.
 
-Stop after Phase 06. If hardware/download access prevents live verification, record the implemented subset and unmet criteria rather than claiming a complete live integration.
+Stop after Phase 09. If hardware/download access prevents live verification, record the implemented subset and unmet criteria rather than claiming a complete live integration.
