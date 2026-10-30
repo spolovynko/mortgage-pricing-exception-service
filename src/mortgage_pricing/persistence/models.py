@@ -256,6 +256,44 @@ class PricingDecision(Base):
     )
 
 
+class AssessmentStatus(StrEnum):
+    COMPLETED = "completed"
+    STALE = "stale"
+
+
+class PricingAssessment(Base):
+    """Advisory output tied to the immutable request version it assessed."""
+
+    __tablename__ = "pricing_assessments"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["request_id", "version_number"],
+            ["request_versions.request_id", "request_versions.version_number"],
+            ondelete="RESTRICT",
+        ),
+        CheckConstraint("version_number >= 1", name="assessment_version_positive"),
+        CheckConstraint("length(model_identity) BETWEEN 1 AND 200", name="assessment_model_length"),
+        CheckConstraint("length(prompt_version) BETWEEN 1 AND 80", name="assessment_prompt_length"),
+        CheckConstraint("length(status) <= 16", name="assessment_status_length"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, default=uuid4)
+    request_id: Mapped[UUID] = mapped_column(Uuid, nullable=False, index=True)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    model_identity: Mapped[str] = mapped_column(String(200), nullable=False)
+    prompt_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    status: Mapped[AssessmentStatus] = mapped_column(
+        Enum(
+            AssessmentStatus,
+            native_enum=False,
+            values_callable=lambda values: [v.value for v in values],
+        ),
+        nullable=False,
+    )
+    result: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
+
+
 class HistoryEventType(StrEnum):
     CREATED = "created"
     REVISED = "revised"

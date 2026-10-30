@@ -9,10 +9,12 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from mortgage_pricing.persistence.models import (
+    AssessmentStatus,
     CreationIdempotencyRecord,
     DecisionOutcome,
     HistoryEventType,
     MortgageApplication,
+    PricingAssessment,
     PricingDecision,
     PricingRequest,
     RequestHistoryEvent,
@@ -37,6 +39,89 @@ class VersionResult:
     request_id: UUID
     version_number: int
     replayed: bool = False
+
+
+@dataclass(frozen=True)
+class AssessmentSnapshot:
+    request_id: UUID
+    version_number: int
+    submitted_by_id: UUID
+    discount_bps: int
+    reason: str
+    context: dict[str, object] | None
+
+
+@dataclass(frozen=True)
+class StoredAssessment:
+    id: UUID
+    status: AssessmentStatus
+
+
+def capture_assessment_snapshot(
+    sessions: sessionmaker[Session], *, reviewer_id: UUID, request_id: UUID, expected_version: int
+) -> AssessmentSnapshot:
+    """Authorize and copy the exact current version; no DB transaction spans inference."""
+    with sessions() as session:
+        _require_role(session, reviewer_id, Role.REVIEWER)
+        request = session.get(PricingRequest, request_id)
+        if request is None:
+            raise OperationError("request_not_found")
+        if request.current_version_number != expected_version:
+            raise OperationError("stale_version")
+        version = session.get(RequestVersion, (request_id, expected_version))
+        if version is None:
+            raise OperationError("stale_version")
+        if reviewer_id in (request.application.manager_id, version.submitted_by_id):
+            raise OperationError("self_review")
+        return AssessmentSnapshot(
+            request_id,
+            expected_version,
+            version.submitted_by_id,
+            version.discount_bps,
+            version.reason,
+            version.context,
+        )
+
+
+def store_assessment_if_current(
+    sessions: sessionmaker[Session],
+    *,
+    reviewer_id: UUID,
+    snapshot: AssessmentSnapshot,
+    model_identity: str,
+    prompt_version: str,
+    result: dict[str, object] | None,
+) -> StoredAssessment:
+    """Persist separately from decisions; raced revisions/decisions are recorded stale."""
+    with sessions.begin() as session:
+        _require_role(session, reviewer_id, Role.REVIEWER)
+        request = _lock_request(session, snapshot.request_id)
+        if reviewer_id in (request.application.manager_id, snapshot.submitted_by_id):
+            raise OperationError("self_review")
+        status = (
+            AssessmentStatus.COMPLETED
+            if request.current_version_number == snapshot.version_number
+            and session.scalar(
+                select(PricingDecision.id).where(
+                    PricingDecision.request_id == snapshot.request_id,
+                    PricingDecision.version_number == snapshot.version_number,
+                )
+            )
+            is None
+            else AssessmentStatus.STALE
+        )
+        assessment = PricingAssessment(
+            request_id=snapshot.request_id,
+            version_number=snapshot.version_number,
+            model_identity=model_identity,
+            prompt_version=prompt_version,
+            status=status,
+            result=result if status == AssessmentStatus.COMPLETED else None,
+        )
+        session.add(assessment)
+        session.flush()
+        stored = StoredAssessment(assessment.id, assessment.status)
+    return stored
 
 
 def _require_role(session: Session, actor_id: UUID, role: Role) -> None:
