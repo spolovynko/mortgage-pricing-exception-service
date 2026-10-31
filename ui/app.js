@@ -702,10 +702,14 @@ async function handleWorkspaceClick(event) {
           const kind = frame.match(/^event: (.+)$/m)?.[1];
           const data = frame.split("\n").find((line) => line.startsWith("data: "))?.slice(6);
           if (!data) continue;
-          if (kind === "delta") {
-            state.assessmentStream += JSON.parse(data);
+          if (kind === "context") {
+            state.assessmentStream = JSON.stringify(JSON.parse(data));
+            render();
+          } else if (kind === "partial") {
+            const context = JSON.parse(state.assessmentStream || "{}");
+            state.assessmentStream = JSON.stringify({ ...context, ...JSON.parse(data) });
             if (state.assessmentTiming?.firstTextAt === null
-                && partialJsonString(state.assessmentStream, "summary").text.length > 0) {
+                && JSON.parse(data).summary) {
               state.assessmentTiming.firstTextAt = performance.now();
             }
             render();

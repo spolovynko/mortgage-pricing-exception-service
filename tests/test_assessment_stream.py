@@ -41,24 +41,22 @@ def live_client(tmp_path: Path) -> Iterator[tuple[TestClient, sessionmaker[Sessi
         client.close()
 
 
-def test_stream_returns_deltas_then_persists_suggestion(live_client, monkeypatch):
+def test_stream_returns_structured_narrative_then_persists_checklist(live_client, monkeypatch):
     client, sessions = live_client
     request_id = create(client)
+    calls = 0
 
     async def fake_stream(**_kwargs):
-        yield {"type": "delta", "text": '{"summary":'}
-        from mortgage_pricing.ai.ollama import AssessmentOutput
+        nonlocal calls
+        calls += 1
+        from mortgage_pricing.ai.assessment_contract import EvidenceSelection
 
-        result = AssessmentOutput(
-            summary="Synthetic summary",
-            reported_claims=[],
-            missing_information=[],
-            limitations=["No external evidence checked."],
-        )
+        result = EvidenceSelection(selected_source_refs=["reason", "discount_bps"])
+        yield {"type": "partial", "result": result}
         yield {
             "type": "complete",
             "result": result,
-            "metrics": {"load_duration": 1_000_000_000, "eval_duration": 2_000_000_000},
+            "metrics": {"ttft_ms": 150, "total_ms": 700},
         }
 
     monkeypatch.setattr(assessments, "stream_assessment", fake_stream)
@@ -68,8 +66,24 @@ def test_stream_returns_deltas_then_persists_suggestion(live_client, monkeypatch
         json={"expected_version": 1},
     )
     assert response.status_code == 200
-    assert "event: delta" in response.text and "event: complete" in response.text
+    assert (
+        "event: context" in response.text
+        and "event: partial" in response.text
+        and "event: complete" in response.text
+    )
     assert "event: metrics" in response.text
+    repeated = client.post(
+        f"/requests/{request_id}/assessments/stream",
+        headers={"X-Demo-User": "blake.reviewer"},
+        json={"expected_version": 1},
+    )
+    assert repeated.status_code == 200 and "event: complete" in repeated.text
+    assert calls == 1
+    import json
+
+    first_result = response.text.split("event: complete\ndata: ", 1)[1].split("\n", 1)[0]
+    cached_result = repeated.text.split("event: complete\ndata: ", 1)[1].split("\n", 1)[0]
+    assert json.loads(first_result)["assessment_id"] == json.loads(cached_result)["assessment_id"]
     with sessions() as session:
         stored = session.scalar(
             select(PricingAssessment).where(PricingAssessment.request_id == UUID(request_id))

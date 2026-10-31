@@ -55,6 +55,21 @@ class AssessmentSnapshot:
 class StoredAssessment:
     id: UUID
     status: AssessmentStatus
+    result: dict[str, object] | None = None
+
+
+def find_assessment_by_key(
+    sessions: sessionmaker[Session], *, idempotency_key: str
+) -> StoredAssessment | None:
+    """Return a completed report for the exact canonical assessment inputs, if present."""
+    with sessions() as session:
+        row = session.scalar(
+            select(PricingAssessment).where(
+                PricingAssessment.idempotency_key == idempotency_key,
+                PricingAssessment.status == AssessmentStatus.COMPLETED,
+            )
+        )
+        return StoredAssessment(row.id, row.status, row.result) if row is not None else None
 
 
 def capture_assessment_snapshot(
@@ -90,11 +105,23 @@ def store_assessment_if_current(
     snapshot: AssessmentSnapshot,
     model_identity: str,
     prompt_version: str,
+    idempotency_key: str | None = None,
     result: dict[str, object] | None,
 ) -> StoredAssessment:
     """Persist separately from decisions; raced revisions/decisions are recorded stale."""
     with sessions.begin() as session:
         _require_role(session, reviewer_id, Role.REVIEWER)
+        existing = (
+            session.scalar(
+                select(PricingAssessment).where(
+                    PricingAssessment.idempotency_key == idempotency_key
+                )
+            )
+            if idempotency_key is not None
+            else None
+        )
+        if existing is not None:
+            return StoredAssessment(existing.id, existing.status, existing.result)
         request = _lock_request(session, snapshot.request_id)
         if reviewer_id in (request.application.manager_id, snapshot.submitted_by_id):
             raise OperationError("self_review")
@@ -115,12 +142,13 @@ def store_assessment_if_current(
             version_number=snapshot.version_number,
             model_identity=model_identity,
             prompt_version=prompt_version,
+            idempotency_key=idempotency_key,
             status=status,
             result=result if status == AssessmentStatus.COMPLETED else None,
         )
         session.add(assessment)
         session.flush()
-        stored = StoredAssessment(assessment.id, assessment.status)
+        stored = StoredAssessment(assessment.id, assessment.status, assessment.result)
     return stored
 
 

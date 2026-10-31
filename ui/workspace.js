@@ -32,19 +32,30 @@ function getFormDraft(kind, reference = "new") {
 function assessmentReportText(record) {
   if (!record?.result) return "";
   const result = record.result;
-  const list = (items) => items?.length ? items.map((item) => `- ${typeof item === "string" ? item : `${item.item} — ${item.reason}`}`).join("\n") : "- None listed";
+  const list = (items) => items?.length ? items.map((item) => `- ${typeof item === "string" ? item : `${item.text || item.item} — ${item.reason || ""}${item.source_refs?.length ? ` [${item.source_refs.join(", ")}]` : ""}`}`).join("\n") : "- None listed";
+  const evidence = result.selected_evidence?.length
+    ? result.selected_evidence.map((item) => `- ${item.field}: ${JSON.stringify(item.value)} [${item.source_ref}]`).join("\n")
+    : result.reported_claims?.length
+      ? result.reported_claims.map((item) => `- ${typeof item === "string" ? item : `${item.text} [${item.source_refs?.join(", ") || "source unavailable"}]`}`).join("\n")
+      : "- No additional fields selected yet";
   return [
     "AI ASSESSMENT REPORT",
     `Request: ${record.request_id}`,
     `Version: ${record.version_number}`,
+    `Model: ${result.model_identity || "Not recorded"}`,
+    `Prompt/rubric/schema: ${result.prompt_version || "legacy"} / ${result.rubric_version || "legacy"} / ${result.report_schema_version || "legacy"}`,
     `Suggested outcome: ${result.suggested_outcome === "suggest_approve" ? "Suggest approve" : result.suggested_outcome === "suggest_do_not_approve" ? "Suggest do not approve" : "No suggestion"}`,
     `Checklist rationale: ${result.outcome_rationale || "Not provided"}`,
     "",
+    "DETERMINISTIC CHECKLIST",
+    result.criteria?.length ? result.criteria.map((item) => `- ${item.criterion_id.replaceAll("_", " ")}: ${item.status.toUpperCase()} — ${item.explanation}${item.evidence_refs?.length ? ` [${item.evidence_refs.join(", ")}]` : ""}`).join("\n") : "- Not available",
+    "",
     "SUMMARY",
     result.summary || "None provided",
+    result.summary_source_refs?.length ? `Source fields: ${result.summary_source_refs.join(", ")}` : "",
     "",
-    "REPORTED CLAIMS (UNVERIFIED)",
-    list(result.reported_claims),
+    result.selected_evidence ? "AI-SELECTED SOURCE FIELDS (VALUES COPIED FROM REQUEST)" : "REPORTED CLAIMS (UNVERIFIED)",
+    evidence,
     "",
     "MISSING INFORMATION TO REVIEW",
     list(result.missing_information),
@@ -57,66 +68,34 @@ function assessmentReportText(record) {
   ].join("\n");
 }
 
-function partialJsonString(raw, key) {
-  const marker = new RegExp(`"${key}"\\s*:\\s*"`).exec(raw);
-  if (!marker) return { text: "", complete: false };
-  let text = "";
-  for (let index = marker.index + marker[0].length; index < raw.length; index += 1) {
-    const char = raw[index];
-    if (char === '"') return { text, complete: true };
-    if (char !== "\\") { text += char; continue; }
-    const escape = raw[index + 1];
-    if (!escape) break;
-    index += 1;
-    const escaped = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" }[escape];
-    if (escaped !== undefined) text += escaped;
-    else if (escape === "u" && /^[\da-f]{4}$/i.test(raw.slice(index + 1, index + 5))) {
-      text += String.fromCharCode(parseInt(raw.slice(index + 1, index + 5), 16));
-      index += 4;
-    }
-  }
-  return { text, complete: false };
-}
-
 function assessmentStreamPreview(requestId, version, raw) {
-  const summary = partialJsonString(raw, "summary");
-  return [
-    "AI ASSESSMENT REPORT",
-    `Request: ${requestId}`,
-    `Version: ${version}`,
-    "Suggested outcome: Calculating from checklist fields…",
-    "Checklist rationale: Pending checklist evaluation.",
-    "",
-    "SUMMARY",
-    summary.text || "Waiting for the report text…",
-    "",
-    "REPORTED CLAIMS (UNVERIFIED)",
-    "Being prepared…",
-    "",
-    "MISSING INFORMATION TO REVIEW",
-    "Being prepared…",
-    "",
-    "LIMITATIONS",
-    "Being prepared…",
-    "",
-    "DECISION AUTHORITY",
-    "Advisory only. A human reviewer records the decision.",
-  ].join("\n");
+  let result;
+  try { result = JSON.parse(raw || "{}"); } catch { result = {}; }
+  return assessmentReportText({
+    request_id: requestId,
+    version_number: version,
+    result: {
+      ...result,
+      suggested_outcome: result.suggested_outcome || "suggest_do_not_approve",
+      outcome_rationale: result.outcome_rationale || "Checklist evaluation is loading.",
+      summary: result.summary || "Preparing a report from the submitted version and checklist…",
+      selected_evidence: result.selected_evidence || [],
+      missing_information: result.missing_information || [],
+      limitations: result.limitations || [],
+      criteria: result.criteria || [],
+    },
+  });
 }
 
 function assessmentPerformanceText(timing, metrics) {
   if (!timing) return "";
-  const seconds = (nanoseconds) => `${(nanoseconds / 1e9).toFixed(1)}s`;
   const items = [];
   if (timing.firstTextAt !== null) items.push(`First report text ${((timing.firstTextAt - timing.startedAt) / 1000).toFixed(1)}s`);
   if (timing.completedAt !== null) items.push(`total ${((timing.completedAt - timing.startedAt) / 1000).toFixed(1)}s`);
-  if (metrics?.load_duration !== undefined) items.push(`model load ${seconds(metrics.load_duration)}`);
-  if (metrics?.prompt_eval_duration !== undefined) items.push(`prompt processing ${seconds(metrics.prompt_eval_duration)}`);
-  if (metrics?.eval_duration !== undefined) {
-    const tokens = metrics.eval_count || 0;
-    const rate = metrics.eval_duration ? ` · ${(tokens / (metrics.eval_duration / 1e9)).toFixed(1)} tokens/s` : "";
-    items.push(`generation ${seconds(metrics.eval_duration)} (${tokens} tokens${rate})`);
-  }
+  if (metrics?.ttft_ms !== undefined) items.push(`model TTFT ${(metrics.ttft_ms / 1000).toFixed(1)}s`);
+  if (metrics?.total_ms !== undefined) items.push(`model total ${(metrics.total_ms / 1000).toFixed(1)}s`);
+  if (metrics?.output_tokens !== undefined) items.push(`${metrics.output_tokens} output tokens`);
+  if (metrics?.output_tokens_per_second !== undefined) items.push(`${metrics.output_tokens_per_second} tokens/s`);
   return items.join(" · ");
 }
 

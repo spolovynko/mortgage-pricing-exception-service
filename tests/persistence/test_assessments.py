@@ -53,9 +53,14 @@ def test_assessment_is_versioned_and_separate_from_decision(sessions):
         snapshot=snapshot,
         model_identity="fake-model",
         prompt_version="pricing-exception-advisor-v1",
+        idempotency_key="f" * 64,
         result={"summary": "Synthetic summary"},
     )
     assert saved.status == AssessmentStatus.COMPLETED
+    from mortgage_pricing.persistence.operations import find_assessment_by_key
+
+    cached = find_assessment_by_key(sessions, idempotency_key="f" * 64)
+    assert cached is not None and cached.id == saved.id
     with sessions() as session:
         row = session.get(PricingAssessment, saved.id)
         assert row.request_id == created.request_id and row.version_number == 1
