@@ -71,7 +71,7 @@ The manager does not enter the actor ID, request/version IDs, submitted timestam
 
 ## 3. Database entity-relationship diagram
 
-There are **eight business tables** and the technical `alembic_version` table. Types below are logical types: UUIDs use SQLite `CHAR(32)`, application monetary values use `NUMERIC(14,2)` with Python Decimal values, roles/outcomes/events use checked string enums, and timestamps are handled as UTC by the persistence type. Nullable columns are `pricing_requests.current_version_number`, `request_versions.context`, and the four application financial columns. Null application financials preserve compatibility with unrelated legacy records; seeding backfills missing values for the ten known demo applications without overwriting saved values.
+There are **nine business tables** and the technical `alembic_version` table. Types below are logical types: UUIDs use SQLite `CHAR(32)`, application monetary values use `NUMERIC(14,2)` with Python Decimal values, roles/outcomes/events use checked string enums, and timestamps are handled as UTC by the persistence type. Nullable columns are `pricing_requests.current_version_number`, `request_versions.context`, `pricing_assessments.result`, `pricing_assessments.idempotency_key`, and the four application financial columns. Null application financials preserve compatibility with unrelated legacy records; seeding backfills missing values for the ten known demo applications without overwriting saved values.
 
 ```mermaid
 erDiagram
@@ -136,6 +136,17 @@ erDiagram
         int version_number FK
         datetime created_at
     }
+    pricing_assessments {
+        uuid id PK
+        uuid request_id FK
+        int version_number FK
+        string model_identity
+        string prompt_version
+        string idempotency_key UK "nullable"
+        string status
+        json result "nullable"
+        datetime created_at
+    }
     alembic_version {
         string version_num PK
     }
@@ -148,6 +159,7 @@ erDiagram
     request_versions |o--o| pricing_requests : current_pointer
     users ||--o{ request_versions : submits
     request_versions ||--o| pricing_decisions : receives
+    request_versions ||--o{ pricing_assessments : receives_advisory_assessments
     user_role_memberships ||--o{ pricing_decisions : reviewer_role_constraint
     request_versions ||--o{ request_history_events : has_events
     users ||--o{ request_history_events : acts
