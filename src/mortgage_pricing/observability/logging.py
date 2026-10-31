@@ -23,7 +23,19 @@ class JsonFormatter(logging.Formatter):
             "outcome": getattr(record, "outcome", None),
             "duration": getattr(record, "duration", None),
         }
-        for field in ("method", "route", "status_code", "actor_id", "request_id", "version_id"):
+        for field in (
+            "method",
+            "route",
+            "status_code",
+            "actor_id",
+            "request_id",
+            "version_id",
+            "assessment_id",
+            "model_digest",
+            "error_code",
+            "users_created",
+            "applications_created",
+        ):
             if hasattr(record, field):
                 entry[field] = getattr(record, field)
         if record.exc_info and record.exc_info[0] is not None:

@@ -10,7 +10,7 @@ This walkthrough uses the fictional seed application `SYN-MORTGAGE-DEMO-CLEAN`. 
 4. Switch back to **Manager** and inspect the request. Approved pricing is available for its current approved version. Select **History** to view submission and decision events.
 5. To demonstrate revision, open the approved request and revise its discount or reason. The new version becomes pending; the prior version and decision remain in history. Review the new version before pricing can be retrieved for it.
 
-The [README screenshots](../README.md#functionality) illustrate the request form, reviewer view, and history. All people, applications, and rationale are fictional. No AI assessment or model control is present; model integration and evaluation are deferred to Phase 09.
+The [README workflow](../README.md#functionality) describes the request form, reviewer view, and history. Screenshots of the core views remain under `docs/images/`. All people, applications, and rationale are fictional. Optional AI advice is available from the Reviewer screen; see the [LLM setup and use guide](local-llm.md). AI never records the actual decision.
 
 ## API walkthrough (PowerShell)
 
@@ -69,3 +69,7 @@ The first create returns version 1; an exact retry returns the original result w
 ## No-AI demonstration
 
 Core Compose mode sets `LLM_MODE=off`; local Python mode defaults it to `off`. Complete the same manager and reviewer flow without configuring or starting a model. Any user-reported competitor offer is captured as unverified context. A manager’s reason remains a claim, not externally verified evidence, and only the reviewer records the business decision.
+
+## Reference views
+
+Synthetic screenshots: [request form](images/demo-new-request.png), [reviewed terms](images/demo-review-terms.png), [decision history](images/demo-decision-history.png), and [AI advisory card](images/ai-advisory-report.png). AI advice remains separate from the human decision.

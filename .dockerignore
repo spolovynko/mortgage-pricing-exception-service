@@ -27,6 +27,11 @@ models
 weights
 tests
 docs
+artifacts
+evals
+scripts
+.github
+AGENTS.md
 .vscode
 .idea
 compose*.yaml

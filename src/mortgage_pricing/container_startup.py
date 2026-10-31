@@ -42,7 +42,7 @@ def prepare_database(settings: Settings) -> SeedResult:
     alembic_config = Config(str(APPLICATION_ROOT / "alembic.ini"))
     alembic_config.attributes["settings"] = settings
     command.upgrade(alembic_config, "head")
-    return seed_database(settings)
+    return seed_database(settings) if settings.seed_demo_data else SeedResult(0, 0)
 
 
 def serve() -> None:

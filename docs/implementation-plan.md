@@ -1,6 +1,6 @@
 # Implementation plan
 
-Status: Phases 01–05 are implemented and assistant-verified; human acceptance is not recorded. Phase 06 now focuses on UI/database hardening and reproducibility. Optional local AI is deferred to the final Phase 09 by the user on 2026-10-30. See [project status](project-status.md).
+Status: Phases 01–08 are implemented and assistant-verified. Phase 09 technical implementation and release checks passed; human AI evaluation and production gates remain open. See [project status](project-status.md).
 
 This plan implements the requirements and the user's agreed additions: a same-origin HTML/CSS/JavaScript UI, optional local AI, automatic model setup, operational logging, central configuration, and one application Dockerfile with one Compose file.
 
@@ -26,7 +26,7 @@ Phases are sequential for this project. A phase can prepare an interface for a l
 - **MVP2:** A reviewer can use the complete human workflow through the containerised UI. One application container runs one Uvicorn process serving both UI and API, per the user's 2026-10-29 requirement change. Application data survives restarts.
 - **MVP3 (optional, Phase 09):** Optional local AI is automatically prepared and evaluated. Human approval works with assistance on, off, or unavailable. The final documentation and reproducibility checks are complete.
 
-MVP2 and MVP3 are delivery labels for this exercise, not claims of production maturity. The PDF treats a custom UI and an additional AI demonstration as bonuses; the UI is implemented and the additional live AI demonstration is deferred to the final optional phase.
+MVP2 and MVP3 are delivery labels for this exercise, not claims of production maturity. The PDF treats a custom UI and an additional AI demonstration as bonuses; the UI is implemented and the additional local AI demonstration is implemented in Phase 09 with provisional evaluation labels and explicit production limits.
 
 ## One chat per phase
 

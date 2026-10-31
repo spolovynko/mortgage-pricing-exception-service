@@ -110,7 +110,10 @@ def store_assessment_if_current(
 ) -> StoredAssessment:
     """Persist separately from decisions; raced revisions/decisions are recorded stale."""
     with sessions.begin() as session:
+        request = _lock_request(session, snapshot.request_id)
         _require_role(session, reviewer_id, Role.REVIEWER)
+        if reviewer_id in (request.application.manager_id, snapshot.submitted_by_id):
+            raise OperationError("self_review")
         existing = (
             session.scalar(
                 select(PricingAssessment).where(
@@ -122,9 +125,6 @@ def store_assessment_if_current(
         )
         if existing is not None:
             return StoredAssessment(existing.id, existing.status, existing.result)
-        request = _lock_request(session, snapshot.request_id)
-        if reviewer_id in (request.application.manager_id, snapshot.submitted_by_id):
-            raise OperationError("self_review")
         status = (
             AssessmentStatus.COMPLETED
             if request.current_version_number == snapshot.version_number

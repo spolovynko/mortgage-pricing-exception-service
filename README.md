@@ -1,175 +1,77 @@
 # Mortgage Pricing Exception Service
 
-## Introduction
+A versioned mortgage-pricing exception workflow with a browser UI, HTTP API, SQLite history, and optional local AI advice. Managers submit a requested discount and rationale; reviewers approve those exact terms or decline them. Revisions preserve earlier versions and decisions.
 
-This project is a demonstration service for handling mortgage pricing exception requests. It models a common step in mortgage pricing: a relationship manager requests a rate discount for an existing application, and a reviewer decides whether to approve it. It focuses on the request and review process; mortgage underwriting and credit approval are outside its scope.
+This is an exercise release with production-style packaging and operational checks. Demo identities and exercise pricing rules are provided; real customer deployment still requires the controls in [production requirements](docs/production-notes.md).
 
-Users work through a browser interface backed by a JSON API. The service stores requests, revisions, decisions, and history in a local database, making it possible to follow how a request changes and why it reached its current outcome. Fictional users and mortgage applications provide data for exploring the workflow.
+## Reviewer quick start — Docker only
 
-The project demonstrates an auditable human decision workflow. Its seeded identities are for demonstration only, and optional AI integration is deferred to a later phase.
+Install [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/) with Linux containers and Compose. Download and extract the repository ZIP, or clone it if Git is installed. No host Python, uv, Node, or Ollama installation is needed for this path.
 
-## Workflow
-
-### Functional workflow
-
-```mermaid
-flowchart LR
-    M[Relationship manager] --> A[Select mortgage application]
-    A --> S[Submit discount request]
-    S --> V[Request version awaits review]
-    V --> R[Reviewer examines version]
-    R --> D{Decision}
-    D -->|Approve| P[Approved pricing available]
-    D -->|Decline| N[Decline recorded]
-    P --> H[View request and decision history]
-    N --> H
-    H --> E{Change terms?}
-    E -->|Yes| NV[Create a new version]
-    NV --> V
-```
-
-### Technical workflow
-
-```mermaid
-flowchart LR
-    U[Browser UI] -->|Same-origin HTTP| API[FastAPI API]
-    API --> V[Validate identity, input, permissions, and version]
-    V --> B[Business operations]
-    B --> DB[(SQLite database)]
-    MIG[Alembic migrations] --> DB
-    SEED[Fictional demo seeds] --> DB
-    DB -->|Request, decision, and history| API
-    API -->|HTTP response| U
-```
-
-Core workflow decisions are made by a human reviewer. AI assessment generation is not part of the current workflow; optional local LLM integration is deferred to Phase 09.
-
-## Methodology
-
-The service treats each submission as a versioned request. Reviewers decide on the exact version they inspect; changing terms creates a new version and requires another review. Decisions and history are retained so the request’s progress can be followed. Synthetic seed data makes the demonstration repeatable, while human approval remains independent of optional AI work.
-
-## Installation
-
-Clone this repository, then choose one of these runtime options:
-
-- **Docker:** Install Docker Desktop with its Linux container engine and Docker Compose v2. Build the image from the repository folder:
+From the extracted repository directory:
 
 ```powershell
-docker compose build
+docker compose up --build --detach --wait app
 ```
 
-- **No Docker:** Install Python 3.12 and uv 0.11.6. From PowerShell in the repository folder, run:
+Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/). Initial startup creates the demo database and ten fictional applications. Repeated startup preserves requests and history. The app serves both UI and API through one Uvicorn process; SQLite is stored in a named Docker volume.
 
-```powershell
-py -3.12 -m pip install uv==0.11.6
-uv sync --locked
-```
+If port 8000 is occupied, set `$env:APP_PORT = '8001'` before starting Compose and open port 8001. Use [installation](docs/installation.md) for platform commands, local Python setup, and configuration.
 
-The first setup needs access to the configured image/package registries unless they are already cached. The direct Python option needs Python and package registry access, but no Docker installation or model download. See [Functionality](#functionality) to start the application with your chosen option.
+## Optional AI — Docker pulls Ollama and the model
 
-To run directly on Windows after installation, prepare local storage and demo data, then start the service:
-
-```powershell
-New-Item -ItemType Directory -Force data | Out-Null
-$env:DEMO_IDENTITY_MODE = 'header'
-uv run --locked python -m alembic upgrade head
-uv run --locked python -m mortgage_pricing.seed
-uv run --locked python -m uvicorn mortgage_pricing.main:create_app --factory --host 127.0.0.1 --port 8000
-```
-
-Keep this terminal open while using the application. Open <http://127.0.0.1:8000/>; press Ctrl+C in the terminal to stop it. The first setup needs Python/package registry access unless dependencies are already cached. Local data is stored in `data/mortgage_pricing.db`.
-
-## Functionality
-
-### Start the application
-
-From the repository folder, start the service and wait for it to become ready:
-
-```powershell
-docker compose up --build --detach --wait
-```
-
-Open the application at <http://127.0.0.1:8000/>. The API documentation is at <http://127.0.0.1:8000/docs>. Compose binds to the local machine only. If port 8000 is already in use, choose another host port:
-
-```powershell
-$env:APP_PORT = '8080'
-docker compose up --build --detach --wait
-```
-
-Then open <http://127.0.0.1:8080/>. Startup applies database migrations and ensures the fictional demo records exist. Core mode runs without AI.
-
-#### Optional local AI assistance
-
-Reviewers can use the complete human workflow without installing Ollama or downloading a model. To explicitly enable the optional local model on Windows PowerShell, start the AI profile with:
+The complete human workflow works without AI. To enable the optional local model, run:
 
 ```powershell
 $env:LLM_MODE = 'auto'
-$env:LLM_BASE_URL = 'http://ollama:11434'
-$env:LLM_MODEL = 'qwen3:4b-instruct-2507-q4_K_M'
-docker compose --profile ai up --build
+docker compose --profile ai up --build --detach
+docker compose --profile ai logs --follow model-init
 ```
 
-This downloads the selected model on first use and stores it in the persistent `model-cache` volume. Later starts reuse that cache. The app may start while setup is running; wait for `model-init` to report readiness before generating an assessment. A setup failure does not stop the core app or human review. Do not run `docker compose down --volumes` if you want to keep the downloaded model. The model and Ollama runtime are optional and are not included in the application image.
+Compose pulls the official pinned Ollama image. The setup job downloads the selected `qwen3:4b-instruct-2507-q4_K_M` model only when it is absent, reports progress, and checks inference readiness. No host Ollama installation or API key is needed. Model weights persist in a separate named volume and are not part of the application image. The first download is several GB; CPU-only inference may be slower than a native GPU installation.
 
-To stop a Compose run while keeping its database, use `docker compose down`; restart it with `docker compose up --detach --wait`. For the local Python option, press Ctrl+C in the server terminal. The separate [troubleshooting and local-data guide](docs/troubleshooting.md) explains persistence and the destructive reset command.
+When model setup reports ready, open the reviewer screen, turn AI on for the session, and choose **Get AI recommendation**. A draft explanation streams into a readable card, followed by the validated recommendation and checks before deciding. AI never records approval or changes request status. See [LLM setup, behavior, and evaluation](docs/local-llm.md).
 
-### Use the application
+![Synthetic optional AI advisory report](docs/images/ai-advisory-report.png)
 
-**Submit a request.** As Manager, choose **New request**, select an application, check its mortgage details, enter a discount and reason, then select **Submit for review**. Required fields are marked in the form. Use fictional, non-identifying information only.
+## Functionality
 
-| Form element | What to enter |
-| --- | --- |
-| Application | Choose the mortgage application for the request. Each application can have one current request. |
-| Mortgage purpose | Select Purchase, Remortgage, or Product transfer. |
-| Rate type | Select Fixed, Variable, or Tracker. |
-| Loan amount and property value | Check the prefilled saved values; edit only if the terms for this request need different values. Both must be positive amounts. |
-| Currency code | Check the three-letter currency code, such as `EUR`. |
-| Term (months) | Check or enter the mortgage term in months. |
-| Standard rate (bps) | Check or enter the standard rate in basis points; 475 bps is 4.75%. |
-| Reason category | Choose Competitive offer, Retention, Relationship, or Other. |
-| Competitor offer | Optional. Expand **Add manager-reported competitor offer** to enter its rate and optional expiry. The offer is recorded as unverified. |
-| Discount (basis points) | Enter a positive whole number. For example, 25 bps is a 0.25 percentage-point discount. The preview shows the resulting requested rate. |
-| Reason for the discount | Explain the commercial reason and supporting information in up to 2,000 characters. Do not enter borrower-identifying data. |
+1. Choose **Manager** to create a request for a fictional application. Enter a positive integer discount in basis points, a rationale, and any relevant structured context.
+2. Choose **Reviewer**, inspect the exact submitted version, and optionally request AI advice.
+3. Use **Approve version** or **Decline version** to record the human decision. Approval accepts the requested amount exactly.
+4. Revise a request to create a new pending version. History retains earlier terms, actors, and decisions; old approved terms are not returned as approval of the new version.
 
-The **Use a synthetic example** control can fill fictional request details and rationale for a demo; it does not submit the request. Review the preview, then select **Submit for review**.
+A 25-basis-point discount means 0.25 percentage points. AI completeness checks are exercise defaults, not bank pricing policy. A generic retention statement does not itself justify a concession.
 
-![New discount request form with a fictional example and requested discount](docs/images/demo-new-request.png)
+The [demo walkthrough](docs/demo.md) covers UI and API scenarios. Interactive API documentation is available at [/docs](http://127.0.0.1:8000/docs). Current business and API contracts are described in [requirements](docs/requirements.md), [API contract](docs/phase-03-api-contract.md), and [data model](docs/current-workflow-and-data-model.md).
 
-**Review the request.** Switch to Reviewer, open **Review queue**, and select **Review terms**. Check the submitted version and record a human approval or decline.
+## Stop and restart
 
-![Reviewer inspecting a submitted request and its terms](docs/images/demo-review-terms.png)
-
-**Inspect the record.** Open **History** to see the submission and decision as separate events. An approved discount applies to the approved current version; a revision requires a new review.
-
-![Request history showing submission and approval events](docs/images/demo-decision-history.png)
-
-Screenshots show one synthetic local run. Names, application numbers, and rationale are fictional.
-
-### Configuration
-
-An optional `.env` file in the repository folder lets Docker Compose read settings without typing them into every command. Create it only when you need an override; Compose supplies defaults for the rest. For example, to use a different host port, add:
-
-```dotenv
-APP_PORT=8080
+```powershell
+docker compose down
+docker compose up --detach --wait app
 ```
 
-Compose supports these runtime overrides:
+Stopping containers preserves application data and downloaded models. Do not add `--volumes` to an ordinary restart. See [database maintenance and troubleshooting](docs/troubleshooting.md) for backup, reset, readiness, and AI errors.
 
-| Variable | Default | When to change it |
-| --- | --- | --- |
-| `APP_PORT` | `8000` | Change if another process already uses port 8000. |
-| `LOG_LEVEL` | `INFO` | Usually leave as is; use `DEBUG` temporarily when diagnosing behavior. |
-| `SQLITE_BUSY_TIMEOUT_SECONDS` | `5` | Increase only if concurrent demo writes regularly time out; maximum is 30. |
-| `UI_TIMEOUT_SECONDS` | `10` | Increase only if UI requests need longer to complete; maximum is 120. |
+## Developer checks
 
-For a basic demo, no `.env` file is required. Keep the container’s database path, demo identity mode, and `LLM_MODE=off` as supplied. The `.env` file is ignored by Git; do not put credentials or other secrets in this demo configuration.
+The supported Python version is 3.12. With [uv](https://docs.astral.sh/uv/getting-started/installation/) and Node installed:
 
-## Tech stack
+```powershell
+uv sync --locked
+uv run --locked python -m pytest -q
+uv run --locked python -m ruff check .
+uv run --locked python -m ruff format --check .
+node --test tests/ui/workspace.test.cjs
+```
 
-- **Backend:** Python 3.12, FastAPI, and Uvicorn.
-- **Frontend:** HTML, CSS, and JavaScript served by the same application process.
-- **Data:** SQLite with SQLAlchemy and Alembic migrations.
-- **Runtime options:** Docker Compose, or Python and uv for running locally without Docker.
-- **Tests:** pytest for Python behavior and Node’s test runner for JavaScript behavior.
+Ordinary tests use synthetic databases and fake model adapters. Live model evaluation is explicitly invoked and has provisional labels pending human review; see [evaluation protocol](evals/phase09/README.md).
 
-See the [demo walkthrough](docs/demo.md) for detailed scenarios and [production considerations](docs/production-notes.md) for deployment follow-ups.
+## Release records
+
+- [Project status](docs/project-status.md) and [Phase 09 handoff](docs/handoffs/phase-09.md)
+- [Architecture](docs/architecture.md), [decisions](docs/adr/README.md), and [build evidence](docs/build-log.md)
+- [AI-use record](docs/ai-usage.md) and [production requirements](docs/production-notes.md)
+
+Do not commit `.env`, databases, model weights, backups, or generated evaluation artifacts.

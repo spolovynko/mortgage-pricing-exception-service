@@ -22,7 +22,9 @@ ENV PATH="/app/.venv/bin:$PATH" \
     MORTGAGE_PRICING_ROOT=/app \
     APP_ENV=production \
     DATABASE_URL=sqlite:////app/data/mortgage_pricing.db \
-    DEMO_IDENTITY_MODE=header \
+    DEMO_IDENTITY_MODE=off \
+    SEED_DEMO_DATA=false \
+    PYDANTIC_AI_NO_BANNER=1 \
     LLM_MODE=off
 
 WORKDIR /app

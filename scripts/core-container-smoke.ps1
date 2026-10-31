@@ -4,12 +4,22 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ($ProjectName -notmatch '^mpes-core-smoke-[a-z0-9-]+$') {
+    throw 'Use a dedicated mpes-core-smoke-* project name.'
+}
+$existing = docker volume ls --filter "label=com.docker.compose.project=$ProjectName" --format '{{.Name}}'
+if ($existing) { throw 'The smoke project already owns volumes; choose a fresh name.' }
+$previousPort = $env:APP_PORT
+$previousMode = $env:LLM_MODE
+$previousProfiles = $env:COMPOSE_PROFILES
 $env:APP_PORT = "$Port"
+$env:LLM_MODE = 'off'
+$env:COMPOSE_PROFILES = ''
 $created = $false
 try {
+    $created = $true
     docker compose --project-name $ProjectName up --build --detach --wait
     if ($LASTEXITCODE -ne 0) { throw "Compose startup failed ($LASTEXITCODE)." }
-    $created = $true
 
     $users = Invoke-RestMethod "http://127.0.0.1:$Port/demo/users" -Headers @{ 'X-Demo-User' = 'ada.manager' }
     $apps = Invoke-RestMethod "http://127.0.0.1:$Port/demo/applications" -Headers @{ 'X-Demo-User' = 'ada.manager' }
@@ -35,8 +45,12 @@ try {
     Write-Output "PASS: isolated create, approve, history, persistence, and cached-image restart ($ProjectName)."
 }
 finally {
+    $env:APP_PORT = "$Port"
     if ($created) {
-        docker compose --project-name $ProjectName down --timeout 10
+        docker compose --project-name $ProjectName down --volumes --timeout 10
         if ($LASTEXITCODE -ne 0) { Write-Warning "Compose cleanup failed for $ProjectName; inspect the isolated project and volume." }
     }
+    $env:APP_PORT = $previousPort
+    $env:LLM_MODE = $previousMode
+    $env:COMPOSE_PROFILES = $previousProfiles
 }

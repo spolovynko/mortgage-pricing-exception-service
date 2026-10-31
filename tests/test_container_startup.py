@@ -13,7 +13,9 @@ from mortgage_pricing.persistence.models import User
 
 def test_prepare_database_migrates_and_seeds_repeatably(tmp_path: Path) -> None:
     database_path = tmp_path / "nested" / "container.db"
-    settings = Settings(_env_file=None, database_url=f"sqlite:///{database_path.as_posix()}")
+    settings = Settings(
+        _env_file=None, database_url=f"sqlite:///{database_path.as_posix()}", seed_demo_data=True
+    )
 
     first = prepare_database(settings)
     second = prepare_database(settings)
@@ -25,6 +27,20 @@ def test_prepare_database_migrates_and_seeds_repeatably(tmp_path: Path) -> None:
     try:
         with create_session_factory(engine)() as session:
             assert session.scalar(select(func.count()).select_from(User)) == first.users_created
+    finally:
+        engine.dispose()
+
+
+def test_default_startup_migrates_without_inserting_demo_identities(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, database_url=f"sqlite:///{(tmp_path / 'empty.db').as_posix()}"
+    )
+    result = prepare_database(settings)
+    assert result.users_created == result.applications_created == 0
+    engine = create_database_engine(settings)
+    try:
+        with create_session_factory(engine)() as session:
+            assert session.scalar(select(func.count()).select_from(User)) == 0
     finally:
         engine.dispose()
 

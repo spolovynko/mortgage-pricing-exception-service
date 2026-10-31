@@ -1,6 +1,7 @@
 """Assessment snapshots and stale-result protection."""
 
 from collections.abc import Iterator
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -83,3 +84,70 @@ def test_assessment_snapshot_rejects_stale_version(sessions):
         capture_assessment_snapshot(
             sessions, reviewer_id=reviewer, request_id=created.request_id, expected_version=2
         )
+
+
+def test_competing_assessment_saves_replay_one_canonical_result(sessions):
+    from mortgage_pricing.persistence.operations import create_request
+
+    manager, reviewer, application = prepare(sessions)
+    created = create_request(
+        sessions,
+        caller_id=manager,
+        application_id=application,
+        discount_bps=25,
+        reason="Synthetic",
+        idempotency_key="race-create",
+    )
+    snapshot = capture_assessment_snapshot(
+        sessions, reviewer_id=reviewer, request_id=created.request_id, expected_version=1
+    )
+
+    def save(number):
+        return store_assessment_if_current(
+            sessions,
+            reviewer_id=reviewer,
+            snapshot=snapshot,
+            model_identity="fake",
+            prompt_version="test",
+            idempotency_key="b" * 64,
+            result={"run": number},
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first, second = list(pool.map(save, [1, 2]))
+    assert first.id == second.id and first.result == second.result
+
+
+def test_revision_during_inference_marks_result_stale(sessions):
+    from mortgage_pricing.persistence.operations import create_request, revise_request
+
+    manager, reviewer, application = prepare(sessions)
+    created = create_request(
+        sessions,
+        caller_id=manager,
+        application_id=application,
+        discount_bps=25,
+        reason="Synthetic",
+        idempotency_key="stale-create",
+    )
+    snapshot = capture_assessment_snapshot(
+        sessions, reviewer_id=reviewer, request_id=created.request_id, expected_version=1
+    )
+    revise_request(
+        sessions,
+        caller_id=manager,
+        request_id=created.request_id,
+        expected_version=1,
+        discount_bps=30,
+        reason="Synthetic revision",
+    )
+    saved = store_assessment_if_current(
+        sessions,
+        reviewer_id=reviewer,
+        snapshot=snapshot,
+        model_identity="fake",
+        prompt_version="test",
+        idempotency_key="c" * 64,
+        result={"explanation": "Old-version opinion"},
+    )
+    assert saved.status == AssessmentStatus.STALE and saved.result is None

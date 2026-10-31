@@ -42,33 +42,33 @@ function form(id = "create-form", reference = "new", changes = {}) {
   return { id, dataset: { reference }, elements: { namedItem: (name) => fields[name] }, reportValidity: () => Object.values(fields).every((field) => !field.validityMessage), fields };
 }
 
-test("assessment report is rendered in a fixed readable text format", () => {
+test("advisory report presents aggregate reasoning and moves sources into details", () => {
   const page = workspace();
-  page.context.testAssessment = {
-    request_id: "request-a", version_number: 2, result: {
-      model_identity: "synthetic-model", prompt_version: "prompt-v4", rubric_version: "rubric-v2", report_schema_version: "schema-v2",
-      suggested_outcome: "suggest_do_not_approve", outcome_rationale: "Required checklist information is missing.",
-      criteria: [{ criterion_id: "reason_category", status: "missing", explanation: "Add reason category.", evidence_refs: [] }],
-      summary: "Review the submitted context.", selected_evidence: [{ field: "reason", value: "Retention", source_ref: "reason" }],
-      missing_information: [{ item: "Income evidence", reason: "Not provided" }], limitations: ["No external verification."],
-    },
-  };
-  const report = page.run("assessmentReportText(testAssessment)");
-  assert.match(report, /^AI ASSESSMENT REPORT/);
-  assert.match(report, /Suggested outcome: Suggest do not approve/);
-  assert.match(report, /Model: synthetic-model/);
-  assert.match(report, /reason category: MISSING — Add reason category\./);
-  assert.match(report, /AI-SELECTED SOURCE FIELDS \(VALUES COPIED FROM REQUEST\)\n- reason: "Retention" \[reason\]/);
-  assert.match(report, /MISSING INFORMATION TO REVIEW\n- Income evidence — Not provided/);
-  assert.match(report, /DECISION AUTHORITY/);
+  page.context.testAssessment = { version_number: 1, result: {
+    recommendation: "needs_more_information",
+    explanation: "Retention alone does not explain why this discount is needed.",
+    next_steps: ["Ask for evidence of retention risk."],
+    source_refs: ["reason"], model_identity: "synthetic-model",
+  } };
+  const text = page.run("assessmentReportText(testAssessment)");
+  assert.match(text, /More information needed/);
+  assert.match(text, /Retention alone does not explain/);
+  assert.match(text, /Before deciding/);
+  assert.doesNotMatch(text, /DETERMINISTIC CHECKLIST|source_refs|synthetic-model/);
+  const html = page.run("assessmentOpinionHtml(testAssessment)");
+  assert.match(html, /<details[^>]*><summary>Review sources/);
+  assert.match(html, /AI suggestion/);
+  assert.doesNotMatch(html, /<pre/);
 });
 
-test("assessment preview streams readable text without exposing its JSON envelope", () => {
+test("streaming prose is escaped and marked as draft", () => {
   const page = workspace();
-  page.context.preview = page.run('assessmentStreamPreview("request-a", 1, JSON.stringify({summary:"Review the submitted terms\\ncarefully", suggested_outcome:"suggest_approve", outcome_rationale:"All exercise checklist fields are present.", criteria:[]}))');
-  assert.match(page.context.preview, /SUMMARY\nReview the submitted terms\ncarefully/);
-  assert.match(page.context.preview, /AI-SELECTED SOURCE FIELDS/);
-  assert.doesNotMatch(page.context.preview, /"summary"/);
+  page.context.testAssessment = { version_number: 1, result: { recommendation: "needs_more_information", explanation: "<img src=x onerror=alert(1)> Explain the concession." } };
+  const html = page.run("assessmentOpinionHtml(testAssessment, true)");
+  assert.match(html, /Draft · streaming/);
+  assert.match(html, /&lt;img/);
+  assert.doesNotMatch(html, /<img/);
+  assert.doesNotMatch(html, /data-action="copy-report"/);
 });
 
 test("assessment performance text distinguishes first text from model generation", () => {

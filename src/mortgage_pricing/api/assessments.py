@@ -13,12 +13,16 @@ from mortgage_pricing.ai.assessment_contract import (
     GENERATION_SETTINGS,
     PROMPT_VERSION,
     REPORT_SCHEMA_VERSION,
-    EvidenceSelection,
+    AdvisoryOpinion,
     assemble_report,
-    available_source_paths,
-    canonical_source_path,
+    pricing_effect,
 )
-from mortgage_pricing.ai.ollama import AssessmentFailure, generate_assessment, stream_assessment
+from mortgage_pricing.ai.ollama import (
+    AssessmentFailure,
+    generate_assessment,
+    resolve_model_digest,
+    stream_assessment,
+)
 from mortgage_pricing.ai.rubric import ChecklistResult, evaluate_checklist
 from mortgage_pricing.api.errors import error_response
 from mortgage_pricing.api.foundation import ActorId
@@ -57,10 +61,11 @@ def _source(snapshot) -> dict[str, object]:
     }
 
 
-def _key(source: dict[str, object], model: str, runtime: str) -> str:
+def _key(source: dict[str, object], model: str, runtime: str, model_digest: str) -> str:
     payload = {
         "snapshot": source,
         "model": model,
+        "model_digest": model_digest,
         "runtime": runtime.rstrip("/"),
         "prompt": PROMPT_VERSION,
         "rubric": evaluate_checklist(source).rubric_version,
@@ -82,13 +87,17 @@ def _report(saved, request_id: UUID, version: int) -> AssessmentResponse:
 
 
 def _assemble(
-    selection: EvidenceSelection,
+    selection: AdvisoryOpinion,
     checklist: ChecklistResult,
     source: dict[str, object],
     model: str,
+    model_digest: str,
+    metrics: dict[str, object],
 ) -> dict[str, object]:
     return assemble_report(selection, checklist, source) | {
         "model_identity": model,
+        "model_digest": model_digest,
+        "generation_metrics": metrics,
         "prompt_version": PROMPT_VERSION,
     }
 
@@ -124,6 +133,13 @@ def _failure(exc: AssessmentFailure, correlation_id: str):
     return error_response(status, exc.code, message, correlation_id)
 
 
+def _audit(request: Request, event: str, request_id: UUID, version: int, **metadata) -> None:
+    request.app.state.logger.info(
+        event,
+        extra={"request_id": str(request_id), "version_id": version, **metadata},
+    )
+
+
 @router.post("/requests/{request_id}/assessments", response_model=AssessmentResponse)
 async def create_assessment(
     request_id: UUID, body: AssessmentRequest, request: Request, actor_id: ActorId
@@ -138,12 +154,35 @@ async def create_assessment(
         return _snapshot_error(exc, correlation_id)
     source = _source(snapshot)
     checklist = evaluate_checklist(source)
-    key = _key(source, settings.llm_model, str(settings.llm_base_url))
+    try:
+        digest = await resolve_model_digest(
+            str(settings.llm_base_url), settings.llm_model, settings.llm_timeout_seconds
+        )
+    except AssessmentFailure as exc:
+        _audit(
+            request,
+            "ai_assessment_failed",
+            request_id,
+            snapshot.version_number,
+            outcome="failure",
+            error_code=exc.code,
+        )
+        return _failure(exc, correlation_id)
+    key = _key(source, settings.llm_model, str(settings.llm_base_url), digest)
     cached = find_assessment_by_key(sessions, idempotency_key=key)
     if cached is not None:
+        _audit(
+            request,
+            "ai_assessment_replayed",
+            request_id,
+            snapshot.version_number,
+            outcome="success",
+            model_digest=digest,
+            assessment_id=str(cached.id),
+        )
         return _report(cached, request_id, snapshot.version_number)
     try:
-        narrative = await generate_assessment(
+        narrative, metrics = await generate_assessment(
             base_url=str(settings.llm_base_url),
             model=settings.llm_model,
             timeout=settings.llm_timeout_seconds,
@@ -151,8 +190,16 @@ async def create_assessment(
             checklist=checklist.model_dump(mode="json"),
         )
     except AssessmentFailure as exc:
+        _audit(
+            request,
+            "ai_assessment_failed",
+            request_id,
+            snapshot.version_number,
+            outcome="failure",
+            error_code=exc.code,
+        )
         return _failure(exc, correlation_id)
-    result_data = _assemble(narrative, checklist, source, settings.llm_model)
+    result_data = _assemble(narrative, checklist, source, settings.llm_model, digest, metrics)
     try:
         saved = store_assessment_if_current(
             sessions,
@@ -165,6 +212,16 @@ async def create_assessment(
         )
     except OperationError as exc:
         return _snapshot_error(exc, correlation_id)
+    _audit(
+        request,
+        "ai_assessment_completed",
+        request_id,
+        snapshot.version_number,
+        outcome=saved.status.value,
+        assessment_id=str(saved.id),
+        model_digest=digest,
+        duration=metrics.get("total_ms", 0) / 1000,
+    )
     return _report(saved, request_id, snapshot.version_number)
 
 
@@ -182,16 +239,28 @@ async def create_assessment_stream(
         return _snapshot_error(exc, correlation_id)
     source = _source(snapshot)
     checklist = evaluate_checklist(source)
-    key = _key(source, settings.llm_model, str(settings.llm_base_url))
+    try:
+        digest = await resolve_model_digest(
+            str(settings.llm_base_url), settings.llm_model, settings.llm_timeout_seconds
+        )
+    except AssessmentFailure as exc:
+        _audit(
+            request,
+            "ai_assessment_failed",
+            request_id,
+            snapshot.version_number,
+            outcome="failure",
+            error_code=exc.code,
+        )
+        return _failure(exc, correlation_id)
+    key = _key(source, settings.llm_model, str(settings.llm_base_url), digest)
 
     async def events():
         yield (
             "event: context\ndata: "
             + json.dumps(
                 {
-                    "criteria": [item.model_dump(mode="json") for item in checklist.criteria],
-                    "suggested_outcome": checklist.suggested_outcome,
-                    "outcome_rationale": checklist.outcome_rationale,
+                    "pricing_effect": pricing_effect(source).get("description"),
                     "model_identity": settings.llm_model,
                     "prompt_version": PROMPT_VERSION,
                     "rubric_version": checklist.rubric_version,
@@ -202,6 +271,15 @@ async def create_assessment_stream(
         )
         cached = find_assessment_by_key(sessions, idempotency_key=key)
         if cached is not None:
+            _audit(
+                request,
+                "ai_assessment_replayed",
+                request_id,
+                snapshot.version_number,
+                outcome="success",
+                model_digest=digest,
+                assessment_id=str(cached.id),
+            )
             yield (
                 "event: complete\ndata: "
                 + _report(cached, request_id, snapshot.version_number).model_dump_json()
@@ -216,27 +294,22 @@ async def create_assessment_stream(
                 snapshot=source,
                 checklist=checklist.model_dump(mode="json"),
             ):
+                if event["type"] == "reset":
+                    yield "event: reset\ndata: {}\n\n"
+                    continue
                 if event["type"] == "partial":
-                    partial_selection: EvidenceSelection = event["result"]
-                    allowed = available_source_paths(source)
-                    valid_refs = [
-                        canonical
-                        for ref in partial_selection.selected_source_refs
-                        if (canonical := canonical_source_path(ref, source)) is not None
-                        and canonical in allowed
-                    ]
-                    if not valid_refs:
-                        continue
-                    partial_selection = partial_selection.model_copy(
-                        update={"selected_source_refs": valid_refs}
-                    )
-                    partial_report = _assemble(
-                        partial_selection, checklist, source, settings.llm_model
-                    )
+                    partial_report = event["result"].model_dump(mode="json")
                     yield ("event: partial\ndata: " + json.dumps(partial_report) + "\n\n")
                     continue
-                selection: EvidenceSelection = event["result"]
-                result_data = _assemble(selection, checklist, source, settings.llm_model)
+                selection: AdvisoryOpinion = event["result"]
+                result_data = _assemble(
+                    selection,
+                    checklist,
+                    source,
+                    settings.llm_model,
+                    digest,
+                    event.get("metrics", {}),
+                )
                 saved = store_assessment_if_current(
                     sessions,
                     reviewer_id=actor_id,
@@ -245,6 +318,16 @@ async def create_assessment_stream(
                     prompt_version=PROMPT_VERSION,
                     idempotency_key=key,
                     result=result_data,
+                )
+                _audit(
+                    request,
+                    "ai_assessment_completed",
+                    request_id,
+                    snapshot.version_number,
+                    outcome=saved.status.value,
+                    assessment_id=str(saved.id),
+                    model_digest=digest,
+                    duration=event.get("metrics", {}).get("total_ms", 0) / 1000,
                 )
                 metrics = event.get("metrics")
                 if isinstance(metrics, dict):
@@ -255,6 +338,14 @@ async def create_assessment_stream(
                     + "\n\n"
                 )
         except AssessmentFailure as exc:
+            _audit(
+                request,
+                "ai_assessment_failed",
+                request_id,
+                snapshot.version_number,
+                outcome="failure",
+                error_code=exc.code,
+            )
             yield "event: error\ndata: " + json.dumps({"code": exc.code}) + "\n\n"
         except OperationError as exc:
             yield "event: error\ndata: " + json.dumps({"code": exc.code}) + "\n\n"

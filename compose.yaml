@@ -10,11 +10,12 @@ services:
       DATABASE_URL: sqlite:////app/data/mortgage_pricing.db
       SQLITE_BUSY_TIMEOUT_SECONDS: ${SQLITE_BUSY_TIMEOUT_SECONDS:-5}
       DEMO_IDENTITY_MODE: header
+      SEED_DEMO_DATA: "true"
       UI_TIMEOUT_SECONDS: ${UI_TIMEOUT_SECONDS:-10}
       LLM_MODE: ${LLM_MODE:-off}
-      LLM_BASE_URL: ${LLM_BASE_URL:-http://127.0.0.1:11434}
+      LLM_BASE_URL: ${COMPOSE_LLM_BASE_URL:-http://ollama:11434}
       LLM_MODEL: ${LLM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
-      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}
+      LLM_TIMEOUT_SECONDS: ${COMPOSE_LLM_TIMEOUT_SECONDS:-120}
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
     volumes:
@@ -24,6 +25,7 @@ services:
       - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=0700
     security_opt:
       - no-new-privileges:true
+    cap_drop: [ALL]
     healthcheck:
       test:
         - CMD
@@ -49,6 +51,7 @@ services:
     profiles: [ai]
     environment:
       OLLAMA_NO_CLOUD: "1"
+      OLLAMA_NUM_PARALLEL: "1"
     volumes:
       - model-cache:/root/.ollama
     healthcheck:
@@ -72,6 +75,8 @@ services:
       LLM_BASE_URL: http://ollama:11434
       LLM_MODEL: ${LLM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
     depends_on:
+      app:
+        condition: service_started
       ollama:
         condition: service_healthy
     restart: "no"
@@ -80,6 +85,7 @@ services:
       - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=0700
     security_opt:
       - no-new-privileges:true
+    cap_drop: [ALL]
 
 volumes:
   application-data:

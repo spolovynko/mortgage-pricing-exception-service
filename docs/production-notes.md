@@ -1,31 +1,26 @@
-# Production considerations
+# Production release requirements
 
-This service is a demonstration, not a production lending system. Its policies are exercise defaults. Before any real use, an organisation would need to design, approve, implement, and independently review the following controls.
+The repository is a reviewable exercise release with production-style container hygiene. It is not approved for real lending deployment. The Compose configuration deliberately opts into fictional identities and seed data for reviewers; `APP_ENV=production` configures the process and does not turn demo identity headers into authentication.
 
-## Identity and authorization
+## Implemented release controls
 
-Replace `DEMO_IDENTITY_MODE=header` and caller-selected demo identities with the organisation’s identity provider, protected sessions or tokens, and a defined role and ownership model. Enforce authorization server-side for every read and write, including reviewer separation, least privilege, service-to-service access, and administrative operations. Add security review, session expiry, credential rotation, and access monitoring. Never treat the demo identity header as proof of a user’s identity.
+- One non-root application container and one Uvicorn process serve UI/API. Root filesystem is read-only; only named database storage and a private temporary filesystem are writable. Linux capabilities are dropped, privilege escalation disabled, logs bounded, and the host port bound to loopback.
+- Bare-image defaults disable demo identities and automatic demo seeding. Compose explicitly enables both for the exercise.
+- Locked Python dependencies, pinned container bases/runtime, additive migrations, health/readiness checks, server-side roles/ownership, exact-version decisions, transaction-bound history, and idempotent retry handling are implemented.
+- Optional local model startup does not block the human workflow. AI advice is separately persisted, explicitly requested, bounded, checked, and followed by an independent human decision. Installed model digest and contract/settings versions participate in assessment cache identity.
+- Operational logs omit prompt, reason and generated-text payloads. Saved reports retain model/digest, references, timing, and state. Application-preserved history is not protection against an administrator replacing the SQLite file.
 
-## Policy and integrations
+## Go-live gates that are still open
 
-Define approved pricing policy, eligibility criteria, discount bounds, evidence requirements, escalation paths, and exception authorities with accountable business owners. The current validation limits are technical exercise constraints, not bank policy. Integrations with loan origination, customer, pricing, identity, and document systems need explicit ownership, data contracts, failure handling, idempotency, reconciliation, and access controls. No external competitor offer is verified by this application.
+1. **Identity:** replace caller-selected demo headers with organizational authentication, protected sessions/tokens, approved role mapping, least privilege, expiry, and access monitoring. Do not expose the Compose demo directly to a public network.
+2. **Business policy:** have accountable owners define real pricing rules, evidence, discount authority, escalation, and system integrations. Current checks are exercise constraints. No external competitor offer is verified.
+3. **AI acceptance:** obtain human-reviewed evaluation labels and independently review rationale faithfulness, errors, bias, and usefulness. Candidate-label agreement is not established accuracy, calibration, or legal compliance. Keep human decision authority and an explicit ability to bypass AI. Legal/compliance owners must assess applicable AI/data-protection obligations for the intended use.
+4. **Data operations:** define privacy/retention controls, encrypted off-host backups, recovery objectives, a tested restore procedure, independent audit protection, capacity monitoring, and incident ownership. A Docker volume is persistence, not a backup.
+5. **Deployment security:** review network/TLS termination, trusted proxies, secrets management, dependency/image scanning, patch ownership, resource limits, rollout/rollback procedures, and load/concurrency behavior. Hosted CI and an independent second-machine deployment require their own recorded evidence.
+6. **Redistribution:** choose and approve the repository's license and notices; no repository license grant is supplied. Check the selected model/runtime licenses and redistribution terms separately.
 
-## Audit, privacy, and retention
+## Supported deployment boundary
 
-The application preserves version and decision history and rejects ordinary application-level edits to immutable records. That does not make a local SQLite file tamper-proof: an operator with database or host access can alter or replace it. Define a lawful data inventory, purpose limitation, minimization, retention/deletion schedule, access review, and incident process. Keep borrower identifiers and unnecessary personal data out of reasons and logs. Protect audit evidence independently from application administrators, for example with access-separated append-only export or a managed audit service, and test its integrity and retrieval.
+The implemented storage is one file-backed SQLite database with one app process. SQLite serializes writes and a bounded busy timeout returns errors rather than promising unlimited throughput. PostgreSQL URLs are recognized by settings but no PostgreSQL persistence/deployment support is implemented. Multiple application replicas, managed-database migration, and a production migration/backup operator workflow require separate design and checks.
 
-## Backups and recovery
-
-Define encrypted, access-controlled backups, retention, recovery-point and recovery-time objectives, off-host storage, key ownership, and restore drills. Monitor backup success and test restored copies against integrity and application-level checks. A named Compose volume is persistence on one Docker host; it is not a backup. `docker compose down --volumes` deletes that demo volume.
-
-## Monitoring and operations
-
-The current JSON logs and `/health` and `/ready` endpoints support local diagnostics. Production operations need centralized protected logs, metrics and alerts for availability, request failures, database lock/contention, latency, capacity, migration status, backup health, and security events. Establish on-call ownership, incident response, patching, vulnerability scanning, and an operational change process. Review log retention and access because even minimized logs can contain operational identifiers.
-
-## Database migrations and concurrency
-
-The current container startup applies Alembic migrations and seeds a single SQLite database before serving. SQLite serializes writes and has a bounded busy timeout; lock timeouts return an error and are not automatically retried. This single-container design is not a multi-instance concurrency guarantee. Before scaling or adopting production workloads, choose and test a managed database and explicit migration process, assess transaction and isolation behavior, add concurrency/load tests, define safe rollout and rollback procedures, and confirm that audit and idempotency guarantees survive migration. PostgreSQL URLs are accepted by settings, but the container startup contract requires writable file-backed SQLite; PostgreSQL deployment is not established by that setting alone.
-
-## AI and decision controls
-
-Optional local LLM integration, model lifecycle, evaluation, and judge calibration are deferred to Phase 09. No AI control or generated assessment is present in the current UI or core Compose workflow. Any future assessment must remain distinct from a human decision, reference the exact request version, disclose uncertainty and evidence limits, and never approve, decline, or authorize pricing on its own.
+Container startup migrates storage and seeds only when `SEED_DEMO_DATA=true`. For a real rollout, use a controlled, backed-up migration procedure; do not use automatic demo seeding. Stop traffic before maintenance, keep deployment artifacts/locks, verify `/ready`, perform a smoke check, and preserve decision history. See [installation](installation.md), [operations](troubleshooting.md), [ADR 0011](adr/0011-local-llm-integration.md), and the current [release evidence](build-log.md).

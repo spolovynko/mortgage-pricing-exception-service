@@ -11,13 +11,18 @@ from pathlib import Path
 from typing import Any
 from urllib.request import urlopen
 
-from mortgage_pricing.ai.assessment_contract import assemble_report
+from mortgage_pricing.ai.assessment_contract import (
+    GENERATION_SETTINGS,
+    PROMPT_VERSION,
+    REPORT_SCHEMA_VERSION,
+    assemble_report,
+)
 from mortgage_pricing.ai.ollama import AssessmentFailure, stream_assessment
 from mortgage_pricing.ai.rubric import evaluate_checklist
 
 ROOT = Path(__file__).resolve().parents[1]
-DATASET_PATH = ROOT / "evals" / "phase09" / "golden-candidate-v1.json"
-DEFAULT_OUTPUT = ROOT / "artifacts" / "ai-evaluation" / "phase09-golden-candidate-v1-results.json"
+DATASET_PATH = ROOT / "evals" / "phase09" / "golden-candidate-v2.json"
+DEFAULT_OUTPUT = ROOT / "artifacts" / "ai-evaluation" / "phase09-advisory-v2-results.json"
 
 
 def _merge(base: dict[str, Any], update: dict[str, Any]) -> dict[str, Any]:
@@ -80,24 +85,20 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     for case in cases:
         snapshot = _merge(dataset["default_snapshot"], case["snapshot_overrides"])
         checklist = evaluate_checklist(snapshot)
-        expected = case["expected"]
-        statuses = {item.criterion_id: item.status for item in checklist.criteria}
-        checklist_matches = (
-            checklist.suggested_outcome == expected["suggested_outcome"]
-            and statuses == expected["criteria"]
-        )
         runs = []
         for repetition in range(args.repeats):
             try:
-                selection, metrics = await _run_once(
+                opinion, metrics = await _run_once(
                     args.base_url, args.model, args.timeout, snapshot, checklist
                 )
                 runs.append(
                     {
                         "repetition": repetition + 1,
-                        "selection": selection.model_dump(mode="json"),
-                        "report": assemble_report(selection, checklist, snapshot),
+                        "opinion": opinion.model_dump(mode="json"),
+                        "report": assemble_report(opinion, checklist, snapshot),
                         "metrics": metrics,
+                        "matches_candidate_recommendation": opinion.recommendation
+                        in case["expected_recommendations"],
                         "error": None,
                     }
                 )
@@ -105,46 +106,32 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
                 runs.append(
                     {
                         "repetition": repetition + 1,
-                        "selection": None,
+                        "opinion": None,
                         "metrics": {},
+                        "matches_candidate_recommendation": False,
                         "error": exc.code,
+                        "validation_detail": exc.detail,
                     }
                 )
-        outputs = [run["selection"] for run in runs]
-        repeatable = (
-            bool(outputs)
-            and all(output is not None for output in outputs)
-            and all(output == outputs[0] for output in outputs[1:])
-        )
+        outputs = [item["opinion"] for item in runs]
+        complete = all(output is not None for output in outputs)
+        exact_repeatable = complete and all(output == outputs[0] for output in outputs[1:])
+        recommendations = [output["recommendation"] for output in outputs if output is not None]
         results.append(
             {
                 "case_id": case["case_id"],
-                "purpose": case["purpose"],
-                "expected_checklist": expected,
-                "actual_checklist": {
-                    "suggested_outcome": checklist.suggested_outcome,
-                    "criteria": statuses,
-                    "matches_candidate_label": checklist_matches,
-                },
-                "review_checks": case["review_checks"],
+                "expected_recommendations": case["expected_recommendations"],
+                "human_review_focus": case["human_review_focus"],
                 "runs": runs,
-                "repeatable_across_requested_runs": repeatable,
-                "required_selection_paths_covered": [
-                    all(
-                        path in (run["selection"] or {}).get("selected_source_refs", [])
-                        for path in case["review_checks"]["must_cover_paths"]
-                    )
-                    for run in runs
-                ],
-                "human_selection_relevance": "pending human review",
+                "exact_output_repeatable": exact_repeatable,
+                "recommendation_repeatable": complete and len(set(recommendations)) == 1,
+                "human_reasoning_quality": "pending human review",
             }
         )
 
-    repeatable_count = sum(case["repeatable_across_requested_runs"] for case in results)
-    covered_paths = sum(sum(case["required_selection_paths_covered"]) for case in results)
-    required_paths = sum(len(case["required_selection_paths_covered"]) for case in results)
+    all_runs = [item for case in results for item in case["runs"]]
     return {
-        "report_version": 1,
+        "report_version": 2,
         "dataset_id": dataset["dataset_id"],
         "dataset_status": dataset["status"],
         "generated_at_utc": datetime.now(UTC).isoformat(),
@@ -153,26 +140,31 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         "model_digest": model_record["digest"],
         "ollama_runtime_version": runtime.get("version"),
         "pydantic_ai_version": version("pydantic-ai-slim"),
+        "prompt_version": PROMPT_VERSION,
+        "report_schema_version": REPORT_SCHEMA_VERSION,
+        "generation_settings": GENERATION_SETTINGS,
         "python_version": platform.python_version(),
         "host_platform": platform.platform(),
         "host_machine": platform.machine(),
         "host_processor": platform.processor() or None,
         "repetitions_per_case": args.repeats,
         "case_count": len(results),
-        "checklist_candidate_label_matches": sum(
-            case["actual_checklist"]["matches_candidate_label"] for case in results
+        "run_count": len(all_runs),
+        "validated_runs": sum(not item["error"] for item in all_runs),
+        "recommendation_label_matches": sum(
+            item["matches_candidate_recommendation"] for item in all_runs
         ),
-        "repeatable_cases": repeatable_count,
-        "required_selection_paths_covered": covered_paths,
-        "required_selection_path_checks": required_paths,
+        "recommendation_repeatable_cases": sum(
+            case["recommendation_repeatable"] for case in results
+        ),
+        "exact_output_repeatable_cases": sum(case["exact_output_repeatable"] for case in results),
         "limitations": [
-            "Expected labels are provisional assistant-generated labels pending human review.",
-            "Narrative accuracy is not automatically scored; review source faithfulness, "
-            "omissions, "
-            "unsupported claims, and limitations manually.",
-            "Repeated output equality over a small sample is not a general determinism guarantee.",
-            "This evaluation cannot establish lending suitability, model calibration, "
-            "or legal compliance.",
+            "Advisory labels are provisional assistant proposals pending human review.",
+            "Citation existence and numeric checks cannot establish full semantic faithfulness.",
+            "Narrative quality and evidence support require human review. "
+            "No accuracy or calibration claim is established.",
+            "Earlier v1 source-selection and completeness scores do not measure "
+            "advisory reasoning quality.",
         ],
         "cases": results,
     }
@@ -197,11 +189,9 @@ def main() -> None:
         json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
     print(
-        f"Wrote {report['case_count']} cases to {args.output}. "
-        f"Checklist labels match: {report['checklist_candidate_label_matches']}; "
-        f"repeatable cases: {report['repeatable_cases']}; "
-        f"selected-path checks passed: {report['required_selection_paths_covered']}/"
-        f"{report['required_selection_path_checks']}. Human report review remains pending."
+        f"Wrote {report['case_count']} cases / {report['run_count']} runs to {args.output}. "
+        f"Validated: {report['validated_runs']}; candidate recommendation matches: "
+        f"{report['recommendation_label_matches']}. Human reasoning review remains pending."
     )
 
 

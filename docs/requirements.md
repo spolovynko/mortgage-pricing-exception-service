@@ -57,7 +57,7 @@ Phase 03 implements these exercise policies as detailed in [ADR 0003](adr/0003-b
 
 ## AI scope
 
-The live feature summarises the submitted version and identifies information missing under an explicit checklist. A statement in a manager's reason is a claim, not verified evidence. The model cannot approve, decline, change status, verify external offers, or invent policy.
+The live feature gives a nonbinding pricing-exception recommendation with a concise explanation and next checks, based on the exact submitted version and an explicit completeness checklist. Complete fields alone do not justify a concession. Manager statements remain unverified claims. The model cannot record approval/decline, change status, verify external offers, or invent bank policy. See [ADR 0011](adr/0011-local-llm-integration.md) for the advisory safeguards and evaluation limits.
 
 An optional offline LLM judge evaluates generated text against the source and a rubric. Its results are calibrated against human-labelled examples. It does not judge mortgage creditworthiness or prove business correctness. AI-assisted development evidence is still required even when the product AI feature is included.
 

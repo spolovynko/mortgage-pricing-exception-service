@@ -197,3 +197,7 @@ There is no stored `pending` status column. A version without a decision is pend
 - [Synthetic seed identities/applications](../src/mortgage_pricing/seed.py), [version-context design rationale](adr/0010-versioned-request-context.md)
 
 The table/column/FK inventory was checked against SQLAlchemy metadata and the current migration sources. This is documentation of existing behavior, not a new migration, live-database audit, full phase gate, or human acceptance. The proposed additions discussed in chat remain unimplemented.
+
+## Optional advisory assessments (Phase 09)
+
+`pricing_assessments` links to an immutable `(request_id, version_number)` and stores completed/stale state independently of `pricing_decisions`. The JSON report retains the advisory opinion, evidence/checklist references, model name/digest, contract versions, and generation metrics. A unique nullable content key replays identical current configured inputs without another generation; inference does not hold a database write transaction. Revisions/decisions racing a new assessment produce a stale result, hidden as current advice. Human-only decision/version invariants above remain authoritative. See [ADR 0011](adr/0011-local-llm-integration.md) and the [LLM guide](local-llm.md).

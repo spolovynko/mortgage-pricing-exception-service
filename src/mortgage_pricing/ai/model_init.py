@@ -64,7 +64,9 @@ def main() -> int:
                 "model": model,
                 "prompt": "Reply with OK.",
                 "stream": False,
-                "options": {"num_predict": 8},
+                "think": False,
+                "keep_alive": "30m",
+                "options": {"num_predict": 8, "temperature": 0, "seed": 7},
             },
             timeout=120,
         ) as response:

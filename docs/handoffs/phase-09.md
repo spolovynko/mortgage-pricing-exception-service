@@ -1,0 +1,11 @@
+# Phase 09 handoff — optional local advisory AI and release polish
+
+- Date: 2026-10-31. Technical implementation and assistant verification passed; phase acceptance remains incomplete pending human semantic evaluation. The user approved the report presentation, not golden labels or production deployment.
+- Git: `main`, base HEAD `0f709ea`; current work is uncommitted. No assistant commit/push/PR.
+- Read: [README](../../README.md), [installation](../installation.md), [LLM guide](../local-llm.md), [ADR 0011](../adr/0011-local-llm-integration.md), and the single [build-evidence entry](../build-log.md#2026-10-31---phase-09-local-ai-and-release-polish).
+- Contracts: one app image/Uvicorn process; explicit optional AI; prompt v6/schema v4/rubric v2; exact rate arithmetic, constrained nonbinding opinions, numeric/source validation, one bounded repair, and escaped draft streaming. Digest/snapshot/contracts/settings identify cached advice. Final reports/metrics remain separate from exact-version human decisions; raced versions become stale.
+- Reviewer setup needs Docker/Compose only; AI profile pulls official Ollama and automatically prepares the selected Qwen model. Host Python/Ollama are optional alternatives. Bare image disables demo identity/seeding; Compose opts in explicitly. Internal model URL and container generation timeout have distinct Compose overrides.
+- Verification: automated gate, core Docker workflow/restart, first model download/readiness, live streamed/cached opinion, stopped-model manual workflow, network-isolated cached restart, and dependency advisory check passed. Evidence distinguishes prior native synthetic evaluation from Docker CPU checks; human explanation review, hosted CI, and second-machine validation are pending.
+- Local demo DB was backed up, erased, migrated and reseeded as authorized; only fictional users/applications remain. Existing Docker data/caches were preserved. Local Uvicorn instances were stopped for reset; startup commands are in installation.
+- Records updated: README/guides, phase checklist, ADR/index, status, architecture/requirements/data model, build/AI-use logs, and this handoff. Historical records/datasets retained.
+- Next: human-review candidate v2 and resolve [production gates](../production-notes.md); do not start another phase automatically.

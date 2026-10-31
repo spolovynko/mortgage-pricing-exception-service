@@ -37,7 +37,7 @@ class ReadinessResponse(BaseModel):
     status: Literal["ready"]
 
 
-SCHEMA_REVISION = "20261030_0004"
+SCHEMA_REVISION = "20261031_0005"
 APPLICATION_ROOT = Path(
     os.environ.get("MORTGAGE_PRICING_ROOT", Path(__file__).resolve().parents[2])
 )

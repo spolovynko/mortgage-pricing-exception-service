@@ -23,7 +23,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 @pytest.fixture
-def live_client(tmp_path: Path) -> Iterator[tuple[TestClient, sessionmaker[Session]]]:
+def live_client(tmp_path: Path, monkeypatch) -> Iterator[tuple[TestClient, sessionmaker[Session]]]:
+    async def fake_digest(*_args):
+        return "1" * 64
+
+    monkeypatch.setattr(assessments, "resolve_model_digest", fake_digest)
     settings = Settings(
         _env_file=None,
         demo_identity_mode="header",
@@ -49,9 +53,14 @@ def test_stream_returns_structured_narrative_then_persists_checklist(live_client
     async def fake_stream(**_kwargs):
         nonlocal calls
         calls += 1
-        from mortgage_pricing.ai.assessment_contract import EvidenceSelection
+        from mortgage_pricing.ai.assessment_contract import AdvisoryOpinion
 
-        result = EvidenceSelection(selected_source_refs=["reason", "discount_bps"])
+        result = AdvisoryOpinion(
+            recommendation="needs_more_information",
+            explanation="The submitted reason needs supporting commercial evidence.",
+            next_steps=["Ask for the discount justification."],
+            source_refs=["reason", "discount_bps"],
+        )
         yield {"type": "partial", "result": result}
         yield {
             "type": "complete",
@@ -88,5 +97,35 @@ def test_stream_returns_structured_narrative_then_persists_checklist(live_client
         stored = session.scalar(
             select(PricingAssessment).where(PricingAssessment.request_id == UUID(request_id))
         )
-        assert stored is not None and stored.result["suggested_outcome"] == "suggest_do_not_approve"
+        assert stored is not None and stored.result["recommendation"] == "needs_more_information"
         assert stored.prompt_version == assessments.PROMPT_VERSION
+        assert stored.result["model_digest"] == "1" * 64
+        assert stored.result["generation_metrics"]["total_ms"] == 700
+
+    async def changed_digest(*_args):
+        return "2" * 64
+
+    monkeypatch.setattr(assessments, "resolve_model_digest", changed_digest)
+    changed = client.post(
+        f"/requests/{request_id}/assessments/stream",
+        headers={"X-Demo-User": "blake.reviewer"},
+        json={"expected_version": 1},
+    )
+    assert "event: complete" in changed.text and calls == 2
+
+
+def test_ai_off_does_not_contact_the_model_runtime(live_client, monkeypatch):
+    client, _ = live_client
+    request_id = create(client)
+    client.app.state.settings = client.app.state.settings.model_copy(update={"llm_mode": "off"})
+
+    async def forbidden_call(*_args):
+        raise AssertionError("AI-off mode must not contact Ollama")
+
+    monkeypatch.setattr(assessments, "resolve_model_digest", forbidden_call)
+    response = client.post(
+        f"/requests/{request_id}/assessments/stream",
+        headers={"X-Demo-User": "blake.reviewer"},
+        json={"expected_version": 1},
+    )
+    assert response.status_code == 503 and response.json()["error"]["code"] == "ai_disabled"

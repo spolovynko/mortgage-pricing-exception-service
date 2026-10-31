@@ -666,8 +666,6 @@ async function handleWorkspaceClick(event) {
     state.assessmentReport = "";
     state.assessmentTiming = null;
     state.assessmentMetrics = null;
-    state.assessmentTiming = null;
-    state.assessmentMetrics = null;
     sessionStorage.setItem("aiEnabled", String(state.aiEnabled));
     render();
   } else if (button.dataset.action === "generate-assessment") {
@@ -709,12 +707,16 @@ async function handleWorkspaceClick(event) {
             const context = JSON.parse(state.assessmentStream || "{}");
             state.assessmentStream = JSON.stringify({ ...context, ...JSON.parse(data) });
             if (state.assessmentTiming?.firstTextAt === null
-                && JSON.parse(data).summary) {
+                && JSON.parse(data).explanation) {
               state.assessmentTiming.firstTextAt = performance.now();
             }
             render();
           } else if (kind === "metrics") {
             state.assessmentMetrics = JSON.parse(data);
+          } else if (kind === "reset") {
+            const context = JSON.parse(state.assessmentStream || "{}");
+            state.assessmentStream = JSON.stringify({ ...context, recommendation: undefined, explanation: "", next_steps: [] });
+            render();
           } else if (kind === "complete") {
             state.assessment = JSON.parse(data);
             state.assessmentStream = "";
@@ -725,6 +727,7 @@ async function handleWorkspaceClick(event) {
         }
         if (done) break;
       }
+      if (!state.assessment) throw new Error("The recommendation stream ended before validation.");
     } catch (error) {
       state.notice = { kind: "error", message: error instanceof ApiError && error.code === "ai_disabled"
         ? "Optional AI assistance is not enabled on this service. Continue the human review."

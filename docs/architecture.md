@@ -91,11 +91,11 @@ Phase 05 implements this as a digest-pinned, multi-stage Python 3.12.12 image wi
 
 The container entrypoint validates file-backed writable SQLite storage, upgrades to Alembic head, inserts only missing fixed synthetic seeds, and then replaces itself with Uvicorn. Preparation failures stop the service before business operations are exposed. `/ready` verifies the current schema and a rollback-only write; `/health` remains process liveness. Core startup sets `LLM_MODE=off` and has no model dependency. See [ADR 0005](adr/0005-containerisation.md).
 
-The named volume preserves business data across normal container recreation; a separate model-cache volume belongs to later AI work. The combined application is the sole core service. Future Ollama/model-init belong to Phase 09 and must not make core startup depend on successful model setup.
+The named volume preserves business data across normal container recreation; the optional Ollama profile uses a separate persistent model-cache volume. The combined application is the sole core service. Ollama/model-init are implemented in the optional AI profile and do not gate core startup.
 
 ## Configuration and AI controls
 
-Use the immutable Pydantic Settings model in `src/mortgage_pricing/config.py`, loaded on demand so application setup and tests can use explicit settings. Values resolve in this order: constructor input, process environment, `.env`, then defaults. `.env.example` documents safe local defaults; real `.env` files are gitignored. `LLM_MODE` accepts `off` and `auto`: `auto` permits later bounded availability discovery but never automatically starts an assessment. It allows the same API configuration to work with or without the Compose AI profile. Profile activation alone does not change API environment variables. Settings construction does not establish database/model connections; the persistence engine connects only when its caller performs I/O.
+Use the immutable Pydantic Settings model in `src/mortgage_pricing/config.py`, loaded on demand so application setup and tests can use explicit settings. Values resolve in this order: constructor input, process environment, `.env`, then defaults. `.env.example` documents safe local defaults; real `.env` files are gitignored. `LLM_MODE` accepts `off` and `auto`: `auto` permits explicitly requested assessments but never starts one automatically. It allows the same API configuration to work with or without the Compose AI profile. Profile activation alone does not change API environment variables. Compose uses a distinct internal runtime URL override rather than inheriting the host Python URL. Settings construction does not establish database/model connections; the persistence engine connects only when its caller performs I/O.
 
 There are three independent facts:
 
@@ -117,4 +117,4 @@ Model calls have timeouts, limited retries, bounded input/output, and clear UI s
 
 ## AI evaluation
 
-The live assistant produces advisory text. A separate evaluation runner measures quality and optionally calls an LLM judge. Use human-labelled references to check the judge; model agreement with itself is not independent evidence. Ordinary tests use explicit fakes and require no model/network. Real model evaluation is separately invoked and labelled.
+The live assistant streams a structured advisory recommendation, a concise explanation, and next checks for the exact submitted version. Backend completeness and rate-arithmetic safeguards constrain recommendations; a styled UI keeps audit details collapsed. Suggestions remain separate from human decisions; see [ADR 0011](adr/0011-local-llm-integration.md). A separate evaluation runner measures quality and optionally calls an LLM judge. Use human-labelled references to check the judge; model agreement with itself is not independent evidence. Ordinary tests use explicit fakes and require no model/network. Real model evaluation is separately invoked and labelled.

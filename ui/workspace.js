@@ -29,62 +29,41 @@ function getFormDraft(kind, reference = "new") {
   } catch { return null; }
 }
 
+function assessmentRecommendationLabel(result) {
+  return ({ approve: "Recommend approval", do_not_approve: "Recommend not approving", needs_more_information: "More information needed" })[result?.recommendation] || "Considering the request…";
+}
+
 function assessmentReportText(record) {
   if (!record?.result) return "";
   const result = record.result;
-  const list = (items) => items?.length ? items.map((item) => `- ${typeof item === "string" ? item : `${item.text || item.item} — ${item.reason || ""}${item.source_refs?.length ? ` [${item.source_refs.join(", ")}]` : ""}`}`).join("\n") : "- None listed";
-  const evidence = result.selected_evidence?.length
-    ? result.selected_evidence.map((item) => `- ${item.field}: ${JSON.stringify(item.value)} [${item.source_ref}]`).join("\n")
-    : result.reported_claims?.length
-      ? result.reported_claims.map((item) => `- ${typeof item === "string" ? item : `${item.text} [${item.source_refs?.join(", ") || "source unavailable"}]`}`).join("\n")
-      : "- No additional fields selected yet";
+  if (!result.recommendation) return "Earlier completeness report. Generate a new report for an advisory recommendation.";
+  const reasons = result.explanation ? [result.explanation] : (result.reasons || []).map((reason) => reason.text || "").filter(Boolean);
   return [
-    "AI ASSESSMENT REPORT",
-    `Request: ${record.request_id}`,
-    `Version: ${record.version_number}`,
-    `Model: ${result.model_identity || "Not recorded"}`,
-    `Prompt/rubric/schema: ${result.prompt_version || "legacy"} / ${result.rubric_version || "legacy"} / ${result.report_schema_version || "legacy"}`,
-    `Suggested outcome: ${result.suggested_outcome === "suggest_approve" ? "Suggest approve" : result.suggested_outcome === "suggest_do_not_approve" ? "Suggest do not approve" : "No suggestion"}`,
-    `Checklist rationale: ${result.outcome_rationale || "Not provided"}`,
-    "",
-    "DETERMINISTIC CHECKLIST",
-    result.criteria?.length ? result.criteria.map((item) => `- ${item.criterion_id.replaceAll("_", " ")}: ${item.status.toUpperCase()} — ${item.explanation}${item.evidence_refs?.length ? ` [${item.evidence_refs.join(", ")}]` : ""}`).join("\n") : "- Not available",
-    "",
-    "SUMMARY",
-    result.summary || "None provided",
-    result.summary_source_refs?.length ? `Source fields: ${result.summary_source_refs.join(", ")}` : "",
-    "",
-    result.selected_evidence ? "AI-SELECTED SOURCE FIELDS (VALUES COPIED FROM REQUEST)" : "REPORTED CLAIMS (UNVERIFIED)",
-    evidence,
-    "",
-    "MISSING INFORMATION TO REVIEW",
-    list(result.missing_information),
-    "",
-    "LIMITATIONS",
-    list(result.limitations),
-    "",
-    "DECISION AUTHORITY",
-    "Advisory only. Verify the submitted version. A human reviewer records the decision; this report does not change request status.",
+    `AI RECOMMENDATION · VERSION ${record.version_number}`,
+    assessmentRecommendationLabel(result), "", reasons.join(" "), "",
+    "Before deciding", ...(result.next_steps || []).map((step) => `- ${step}`), "",
+    result.notice || "AI suggestion based on submitted information. A human reviewer makes the decision.",
   ].join("\n");
 }
 
-function assessmentStreamPreview(requestId, version, raw) {
-  let result;
-  try { result = JSON.parse(raw || "{}"); } catch { result = {}; }
-  return assessmentReportText({
-    request_id: requestId,
-    version_number: version,
-    result: {
-      ...result,
-      suggested_outcome: result.suggested_outcome || "suggest_do_not_approve",
-      outcome_rationale: result.outcome_rationale || "Checklist evaluation is loading.",
-      summary: result.summary || "Preparing a report from the submitted version and checklist…",
-      selected_evidence: result.selected_evidence || [],
-      missing_information: result.missing_information || [],
-      limitations: result.limitations || [],
-      criteria: result.criteria || [],
-    },
-  });
+function assessmentOpinionHtml(record, streaming = false, performanceText = "") {
+  const result = record?.result || {};
+  if (!streaming && !result.recommendation) {
+    return '<div class="notice">This earlier report checked completeness. Generate a new report for an advisory recommendation with reasons.</div>';
+  }
+  const tone = ["approve", "do_not_approve", "needs_more_information"].includes(result.recommendation) ? result.recommendation : "pending";
+  const reasons = result.explanation ? [result.explanation] : (result.reasons || []).map((reason) => reason.text || "").filter(Boolean);
+  const text = reasons.join(" ");
+  const steps = (result.next_steps || []).filter((step) => typeof step === "string" && step.trim());
+  const refs = result.source_refs || [...new Set((result.reasons || []).flatMap((reason) => reason.source_refs || []))];
+  return `<section class="ai-opinion ${tone}" role="status" aria-live="polite" aria-atomic="false">
+    <div class="ai-opinion-header"><span>AI recommendation · Version ${record?.version_number || ""}</span>${streaming ? '<span class="ai-stream-indicator">Draft · streaming</span>' : '<button class="button small" type="button" data-action="copy-report">Copy</button>'}</div>
+    <h4>${escapeHtml(assessmentRecommendationLabel(result))}</h4>
+    <div class="ai-opinion-prose">${text ? `<p>${escapeHtml(text)}</p>` : '<p class="help">Reading the submitted request and preparing the explanation…</p>'}</div>
+    ${steps.length ? `<div class="ai-next-steps"><strong>Before deciding</strong><ul>${steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ul></div>` : ""}
+    <p class="ai-advisory-note">${streaming ? "Draft advice; the final report is checked before it is saved." : escapeHtml(result.notice || "AI suggestion. A human reviewer makes the decision.")}</p>
+    ${!streaming ? `<details class="ai-report-details"><summary>Review sources and technical details</summary><p>${escapeHtml(result.pricing_effect || "")}</p><p>Model: ${escapeHtml(result.model_identity || "Not recorded")}</p><p>Prompt: ${escapeHtml(result.prompt_version || "")} · Rubric: ${escapeHtml(result.rubric_version || "")}</p><p>Referenced fields: ${escapeHtml(refs.join(", "))}</p>${performanceText ? `<p>${escapeHtml(performanceText)}</p>` : ""}</details>` : ""}
+  </section>`;
 }
 
 function assessmentPerformanceText(timing, metrics) {
@@ -267,13 +246,15 @@ function renderReview() {
   const pending = state.requests.filter((row) => row.status === "pending"), detail = state.reviewDetail;
   const own = detail && (detail.current_version.submitted_by_login === state.login || appFor(detail.application_id)?.manager_id === currentUser()?.id);
   const canDecide = detail?.status === "pending" && !own;
-  const assessment = state.assessment?.result;
-  const suggestion = assessment?.suggested_outcome === "suggest_approve" ? "Suggest approve" : assessment?.suggested_outcome === "suggest_do_not_approve" ? "Suggest do not approve" : "No suggestion in this earlier report; generate a fresh report.";
-  const streamingReport = state.busy
-    ? assessmentStreamPreview(detail.request_id, detail.current_version.version_number, state.assessmentStream)
-    : "";
   const performanceText = assessmentPerformanceText(state.assessmentTiming, state.assessmentMetrics);
-  const aiPanel = detail && !own ? `<hr class="section-divider"><h3>Optional AI assistance</h3><p class="help">Local model assistance is optional. You can review and decide without installing or enabling it.</p><div class="button-row"><button class="button quiet" type="button" data-action="ai-toggle" aria-pressed="${state.aiEnabled}">${state.aiEnabled ? "Turn AI off" : "Turn AI on for this session"}</button><button class="button" type="button" data-action="generate-assessment" ${!state.aiEnabled || state.busy ? "disabled" : ""}>Generate report for v${detail.current_version.version_number}</button></div>${state.busy ? `<section class="notice ai-result" role="status" aria-live="polite"><strong>AI report · Streaming</strong><pre class="ai-report-text">${escapeHtml(streamingReport)}</pre><p class="help">${escapeHtml(performanceText || "Waiting for first model text…")}</p></section>` : ""}${state.assessment?.status === "stale" ? '<div class="notice warning" role="status">The request changed during generation. This assessment is stale and hidden.</div>' : assessment ? `<section class="notice ai-result" role="status" aria-live="polite"><div class="card-header"><h4>AI assessment report · Version ${state.assessment.version_number}</h4><button class="button small" type="button" data-action="copy-report">Copy report</button></div><pre class="ai-report-text">${escapeHtml(state.assessmentReport || assessmentReportText(state.assessment))}</pre>${performanceText ? `<p class="help">${escapeHtml(performanceText)}</p>` : ""}</section>` : ""}` : "";
+  let draftResult;
+  try { draftResult = JSON.parse(state.assessmentStream || "{}"); } catch { draftResult = {}; }
+  const aiContent = state.busy
+    ? assessmentOpinionHtml({ version_number: detail?.current_version.version_number, result: draftResult }, true)
+    : state.assessment?.status === "stale"
+      ? '<div class="notice warning">The request changed during generation. Generate advice for the current version.</div>'
+      : state.assessment?.result ? assessmentOpinionHtml(state.assessment, false, performanceText) : "";
+  const aiPanel = detail && !own ? `<hr class="section-divider"><h3>AI assistance</h3><p class="help">Optional advice for your review. You can decide without using AI.</p><div class="button-row"><button class="button quiet" type="button" data-action="ai-toggle" aria-pressed="${state.aiEnabled}">${state.aiEnabled ? "Turn AI off" : "Turn AI on for this session"}</button><button class="button" type="button" data-action="generate-assessment" ${!state.aiEnabled || state.busy ? "disabled" : ""}>${state.busy ? "Preparing recommendation…" : "Get AI recommendation"}</button></div>${aiContent}` : "";
   return `${pageHeading("Review queue", "Review the submitted terms and record a human decision.", '<button class="button" data-action="reload">Refresh queue</button>')}<div class="review-layout"><section class="card"><div class="card-header"><h2>Awaiting review</h2><span class="version-tag">${pending.length}</span></div>${pending.length ? listRequests(pending, state.selectedReviewId) : empty("New submissions will appear here.", "Queue is clear")}</section><section class="card">${detail ? detailFields(detail) : empty("Choose a pending request to see its submitted terms.", "Ready for your review")}${own ? '<div class="notice warning">You cannot review your own application or submission.</div>' : ""}${aiPanel}${canDecide ? `<hr class="section-divider"><h3>Decision on version ${detail.current_version.version_number}</h3><p class="help">Approval accepts the requested discount exactly. Editing terms requires a new version.</p><div class="button-row"><button class="button primary" data-action="decide" data-outcome="approved" ${state.busy ? "disabled" : ""}>Approve version ${detail.current_version.version_number}</button><button class="button danger" data-action="decide" data-outcome="declined" ${state.busy ? "disabled" : ""}>Decline version ${detail.current_version.version_number}</button></div>` : ""}${detail ? `<div class="button-row"><button class="button quiet" data-action="view-history" data-request="${escapeHtml(detail.request_id)}">View decision history</button></div>` : ""}</section></div>`;
 }
 

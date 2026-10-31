@@ -221,7 +221,12 @@ __marimo__/
 
 # Local application data and SQLite database sidecar files
 /data/
-/artifacts/ai-evaluation/
+/artifacts/
+/models/
+/weights/
+.ollama/
+*.gguf
+*.safetensors
 *.db
 *.db-journal
 *.db-wal
