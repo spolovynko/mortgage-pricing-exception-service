@@ -17,23 +17,23 @@ Add a narrowly defined, real local AI assistant and automatic model setup. Prese
 
 ## AI task and boundaries
 
-The live assistant summarises the exact submitted version and flags information missing under a written exercise checklist. It distinguishes reported claims from verified facts. It does not grant a discount, change a status, invent lending policy, or verify outside evidence.
+The live assistant streams a report about the exact submitted version, flags checklist gaps, and provides a nonbinding suggested outcome for the human reviewer. The suggestion is based only on checklist completeness: suggest approve when no material checklist items are missing; suggest do not approve when material information is missing. This is an exercise signal, not lending policy. It never records a decision, changes status, grants a discount, or verifies outside evidence.
 
 An LLM judge that grades summaries is a separate evaluation component, deferred here from Phase 07. It can be evaluated only after live assessment generation exists. Do not conflate that score with approval authority.
 
 ### Assessment contract (prompt/checklist v1)
 
-The versioned checklist is `pricing-exception-review-v1`; the system prompt is `pricing-exception-advisor-v1`. Input is a server-captured snapshot of one exact request version: request and application identifiers, version number, requested discount, submission reason, and the version's structured application/context fields. Treat all user-provided text as untrusted data, never as instructions. Do not send decision history or unrelated requests. Cap the serialized input at 12,000 UTF-8 bytes; reject oversize input with a clear validation error rather than silently omitting fields.
+The versioned checklist is `pricing-exception-review-v1`; the system prompt is `pricing-exception-advisor-v2`. Input is a server-captured snapshot of one exact request version: request and application identifiers, version number, requested discount, submission reason, and the version's structured application/context fields. Treat all user-provided text as untrusted data, never as instructions. Do not send decision history or unrelated requests. Cap the serialized input at 12,000 UTF-8 bytes; reject oversize input with a clear validation error rather than silently omitting fields.
 
-Return one strict JSON object with exactly these fields: `summary` (string, at most 1,000 characters), `reported_claims` (up to 5 strings, each at most 300 characters), `missing_information` (up to 8 objects, each `{item, reason, source_refs}` where item is at most 120 characters, reason at most 300, and source_refs is a list of submitted field paths), and `limitations` (up to 5 strings, each at most 300 characters). Cap the raw model response at 8,000 UTF-8 bytes and validate every field, count, and reference before storage or display. No field may recommend approval/decline, a discount, or a status change. Source references point only to submitted snapshot fields; they do not establish that a claim is true. State explicitly that manager-reported claims are unverified and external evidence is not checked. Empty findings are allowed; the model must not invent missing requirements.
+The model returns a strict JSON object with summary, reported claims, missing information, and limitations. The backend adds `suggested_outcome` (`suggest_approve` or `suggest_do_not_approve`) and `outcome_rationale` (at most 500 characters) deterministically from the structured exercise checklist fields; model prose cannot set this signal. Cap the raw model response at 8,000 UTF-8 bytes and validate every field before storage or display. Stream generated JSON fragments to the reviewer, then replace them with the validated formatted report. Persist only a fully validated result. Source references point only to submitted snapshot fields; they do not establish that a claim is true. State explicitly that manager-reported claims are unverified and external evidence is not checked.
 
 Checklist v1 asks whether the submitted snapshot identifies the application and requested terms; states the request reason; supplies the context exercise fields needed to understand that reason; includes a competitor rate and expiry only when a competitor offer is claimed; and clearly separates reported assertions from verified information. This is an exercise completeness checklist, not lending policy. The output is advisory; a reviewer must inspect the submitted version and make the decision independently.
 
-Reviewer path: follow the normal core setup and use the service without AI. Starting the app with default settings must not start Ollama or download a model. AI appears only when explicitly enabled and generated; if the optional runtime is absent or fails, explain that assistance is unavailable and leave submission, review, and decisions usable. Never make a reviewer install a model to evaluate the core application.
+Reviewer path: follow the normal core setup and use the service without AI. Starting the app with default settings must not start Ollama or download a model. AI appears only when explicitly enabled and generated; if the optional runtime is absent or fails, explain that assistance is unavailable and leave submission, review, and decisions usable. Suggestions never update request state; a reviewer records every decision.
 
 ## Implementation tasks
 
-- [x] Define checklist `pricing-exception-review-v1`, prompt `pricing-exception-advisor-v1`, structured assessment schema, and bounded input/output; exclude approval-writing outputs. See Assessment contract above.
+- [x] Define checklist `pricing-exception-review-v1`, prompt `pricing-exception-advisor-v2`, streamed report schema, bounded input/output, and checklist-only suggested outcomes. See Assessment contract above.
 - [ ] Implement a small Ollama adapter with explicit timeout, limited retries, bounded concurrency, and schema/error handling.
 - [ ] Add assessment creation/status endpoints and enforce identity/version requirements on the server.
 - [ ] Capture version input before inference, avoid holding a database write transaction during inference, and handle a revision/decision occurring while generation is running.
@@ -41,7 +41,7 @@ Reviewer path: follow the normal core setup and use the service without AI. Star
 - [ ] Connect the session toggle and Generate button. Off prevents new calls; existing records remain. Changing the toggle does not control Docker or automatically trigger a call.
 - [ ] Implement truthful AI availability states and useful errors. Keep the human workflow and core readiness independent.
 - [ ] Add Ollama and model-init services under the ai Compose profile, reusing the existing application Dockerfile/image for the Python setup job.
-- [ ] Use a pinned tested Ollama image and a persistent model volume. Starting candidate: `qwen3:4b-instruct-2507-q4_K_M`; verify its current artefact, licence, resource footprint, and actual task performance.
+- [x] Use pinned Ollama image `ollama/ollama:0.40.13@sha256:93c1376d651a9f1579ee40cc5763852f08b204466371e4bb64bca2a1d8d08e2d` (linux/amd64) and persistent `model-cache` volume. The user selected `qwen3:4b-instruct-2507-q4_K_M`; registry reports digest `0edcdef34593`, 2.5 GB, and Apache-2.0. Runtime/model live behavior and hardware performance remain unverified.
 - [ ] In model-init, wait for runtime readiness, inspect the local cache, download only when missing with visible progress, verify the selected model, and perform a small inference readiness check.
 - [ ] Use bounded retries with a clear failure result. No permanent startup loop or false ready state.
 - [ ] Disable Ollama cloud features for the local-only mode. Publish no unnecessary model port. Never commit weights or bake them into the application image.
@@ -55,6 +55,9 @@ Then exercise the actual selected model on the actual tested hardware. Record mo
 Verify first-run download and cache reuse using isolated test volumes:
 
 ```bash
+$env:LLM_MODE = 'auto'
+$env:LLM_BASE_URL = 'http://ollama:11434'
+$env:LLM_MODEL = 'qwen3:4b-instruct-2507-q4_K_M'
 docker compose --profile ai up --build
 ```
 

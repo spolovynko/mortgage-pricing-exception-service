@@ -11,7 +11,10 @@ services:
       SQLITE_BUSY_TIMEOUT_SECONDS: ${SQLITE_BUSY_TIMEOUT_SECONDS:-5}
       DEMO_IDENTITY_MODE: header
       UI_TIMEOUT_SECONDS: ${UI_TIMEOUT_SECONDS:-10}
-      LLM_MODE: "off"
+      LLM_MODE: ${LLM_MODE:-off}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://127.0.0.1:11434}
+      LLM_MODEL: ${LLM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-30}
     ports:
       - "127.0.0.1:${APP_PORT:-8000}:8000"
     volumes:
@@ -40,5 +43,44 @@ services:
         max-size: 10m
         max-file: "3"
 
+  ollama:
+    image: ollama/ollama:0.40.13@sha256:93c1376d651a9f1579ee40cc5763852f08b204466371e4bb64bca2a1d8d08e2d
+    platform: linux/amd64
+    profiles: [ai]
+    environment:
+      OLLAMA_NO_CLOUD: "1"
+    volumes:
+      - model-cache:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 10s
+    restart: "no"
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  model-init:
+    image: mortgage-pricing-exception-service:local
+    profiles: [ai]
+    command: ["python", "-m", "mortgage_pricing.ai.model_init"]
+    environment:
+      LLM_BASE_URL: http://ollama:11434
+      LLM_MODEL: ${LLM_MODEL:-qwen3:4b-instruct-2507-q4_K_M}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,mode=0700
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   application-data:
+  model-cache:

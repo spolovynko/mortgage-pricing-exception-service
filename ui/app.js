@@ -27,6 +27,10 @@ const state = {
   busy: false,
   aiEnabled: sessionStorage.getItem("aiEnabled") === "true",
   assessment: null,
+  assessmentStream: "",
+  assessmentReport: "",
+  assessmentTiming: null,
+  assessmentMetrics: null,
 };
 
 const applicationFinancialFields = ["loan_amount", "property_value", "standard_rate_bps", "term_months"];
@@ -342,9 +346,25 @@ async function loadRequest(requestId, target = "detail") {
       if (state.reviewDetail?.request_id !== requestId
           || state.reviewDetail?.current_version.version_number !== detail.current_version.version_number) {
         state.assessment = null;
+        state.assessmentStream = "";
+        state.assessmentReport = "";
+        state.assessmentTiming = null;
+        state.assessmentMetrics = null;
       }
       state.selectedReviewId = requestId;
       state.reviewDetail = detail;
+      state.assessmentTiming = null;
+      state.assessmentMetrics = null;
+      try {
+        const assessments = await api(
+          `/requests/${encodeURIComponent(requestId)}/assessments?expected_version=${detail.current_version.version_number}`,
+        );
+        state.assessment = assessments[0] || null;
+        state.assessmentReport = assessmentReportText(state.assessment);
+      } catch {
+        state.assessment = null;
+        state.assessmentReport = "";
+      }
     } else {
       state.selectedRequestId = requestId;
       state.detail = detail;
@@ -632,25 +652,81 @@ async function handleWorkspaceClick(event) {
     state.createApplicationId = "";
     state.notice = { kind: "success", message: "Draft discarded. Saved requests are unchanged." };
     render({ focusHeading: true });
+  } else if (button.dataset.action === "copy-report") {
+    try {
+      await navigator.clipboard.writeText(state.assessmentReport || assessmentReportText(state.assessment));
+      state.notice = { kind: "success", message: "Assessment report copied." };
+    } catch {
+      state.notice = { kind: "error", message: "Could not copy the report. Select and copy the report text instead." };
+    }
+    render();
   } else if (button.dataset.action === "ai-toggle") {
     state.aiEnabled = !state.aiEnabled;
     state.assessment = null;
+    state.assessmentReport = "";
+    state.assessmentTiming = null;
+    state.assessmentMetrics = null;
+    state.assessmentTiming = null;
+    state.assessmentMetrics = null;
     sessionStorage.setItem("aiEnabled", String(state.aiEnabled));
     render();
   } else if (button.dataset.action === "generate-assessment") {
     if (!state.aiEnabled || !state.reviewDetail) return;
     state.busy = true;
     state.assessment = null;
+    state.assessmentStream = "";
+    state.assessmentReport = "";
+    state.assessmentTiming = { startedAt: performance.now(), firstTextAt: null, completedAt: null };
+    state.assessmentMetrics = null;
     render();
     try {
-      state.assessment = await api(`/requests/${state.reviewDetail.request_id}/assessments`, {
-        method: "POST", body: { expected_version: state.reviewDetail.current_version.version_number },
+      const response = await fetch(`/requests/${state.reviewDetail.request_id}/assessments/stream`, {
+        method: "POST",
+        headers: { "X-Demo-User": state.login, "Content-Type": "application/json", "Accept": "text/event-stream" },
+        body: JSON.stringify({ expected_version: state.reviewDetail.current_version.version_number }),
       });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new ApiError(response.status, error.error?.code || "assessment_failed",
+          error.error?.message || "Assessment failed", error.correlation_id);
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop();
+        for (const frame of frames) {
+          const kind = frame.match(/^event: (.+)$/m)?.[1];
+          const data = frame.split("\n").find((line) => line.startsWith("data: "))?.slice(6);
+          if (!data) continue;
+          if (kind === "delta") {
+            state.assessmentStream += JSON.parse(data);
+            if (state.assessmentTiming?.firstTextAt === null
+                && partialJsonString(state.assessmentStream, "summary").text.length > 0) {
+              state.assessmentTiming.firstTextAt = performance.now();
+            }
+            render();
+          } else if (kind === "metrics") {
+            state.assessmentMetrics = JSON.parse(data);
+          } else if (kind === "complete") {
+            state.assessment = JSON.parse(data);
+            state.assessmentStream = "";
+            state.assessmentReport = assessmentReportText(state.assessment);
+          } else if (kind === "error") {
+            throw new Error("The model could not finish a valid report. Please retry.");
+          }
+        }
+        if (done) break;
+      }
     } catch (error) {
       state.notice = { kind: "error", message: error instanceof ApiError && error.code === "ai_disabled"
         ? "Optional AI assistance is not enabled on this service. Continue the human review."
         : "AI assistance is unavailable. Continue the human review." };
     } finally {
+      if (state.assessmentTiming) state.assessmentTiming.completedAt = performance.now();
       state.busy = false;
       render();
     }

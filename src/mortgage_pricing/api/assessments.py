@@ -1,13 +1,19 @@
 """Explicitly invoked, optional advisory assessment endpoints."""
 
+import json
 from uuid import UUID
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response, StreamingResponse
 
-from mortgage_pricing.ai.ollama import AssessmentFailure, generate_assessment
+from mortgage_pricing.ai.ollama import (
+    PROMPT_VERSION,
+    AssessmentFailure,
+    generate_assessment,
+    stream_assessment,
+)
 from mortgage_pricing.api.errors import error_response
 from mortgage_pricing.api.foundation import ActorId
 from mortgage_pricing.persistence.database import create_session_factory
@@ -32,6 +38,56 @@ class AssessmentResponse(BaseModel):
     version_number: int
     status: str
     result: dict[str, object] | None
+
+
+def _checklist_suggestion(context: dict[str, object] | None) -> dict[str, str]:
+    """Derive an exercise completeness signal from submitted fields, not model prose."""
+    missing: list[str] = []
+    if context is None:
+        missing.append("structured application context")
+    else:
+        application = context.get("application")
+        required = (
+            "purpose",
+            "rate_type",
+            "loan_amount",
+            "property_value",
+            "currency_code",
+            "term_months",
+            "standard_rate_bps",
+        )
+        if not isinstance(application, dict):
+            missing.append("application context")
+        else:
+            missing.extend(
+                f"application.{field}" for field in required if application.get(field) in (None, "")
+            )
+        if not context.get("reason_category"):
+            missing.append("reason_category")
+        if context.get("reason_category") == "competitive_offer":
+            offer = context.get("competitor_offer")
+            if not isinstance(offer, dict):
+                missing.append("competitor offer rate and expiry")
+            else:
+                if offer.get("rate_bps") is None:
+                    missing.append("competitor_offer.rate_bps")
+                if not offer.get("expires_on"):
+                    missing.append("competitor_offer.expires_on")
+    if missing:
+        return {
+            "suggested_outcome": "suggest_do_not_approve",
+            "outcome_rationale": "Exercise checklist fields are missing: "
+            + ", ".join(missing)
+            + ".",
+        }
+    rationale = (
+        "Submitted structured fields meet this exercise completeness checklist; "
+        "claims and external evidence remain unverified."
+    )
+    return {
+        "suggested_outcome": "suggest_approve",
+        "outcome_rationale": rationale,
+    }
 
 
 @router.post("/requests/{request_id}/assessments", response_model=AssessmentResponse)
@@ -80,14 +136,15 @@ async def create_assessment(
             else "AI assistance is unavailable or returned invalid output."
         )
         return error_response(status, exc.code, message, correlation_id)
+    result_data = result.model_dump(mode="json") | _checklist_suggestion(snapshot.context)
     try:
         saved = store_assessment_if_current(
             sessions,
             reviewer_id=actor_id,
             snapshot=snapshot,
             model_identity=settings.llm_model,
-            prompt_version="pricing-exception-advisor-v1",
-            result=result.model_dump(mode="json"),
+            prompt_version=PROMPT_VERSION,
+            result=result_data,
         )
     except OperationError as exc:
         status = 404 if exc.code == "request_not_found" else 403
@@ -97,7 +154,83 @@ async def create_assessment(
         request_id=request_id,
         version_number=snapshot.version_number,
         status=saved.status.value,
-        result=result.model_dump(mode="json") if saved.status.value == "completed" else None,
+        result=result_data if saved.status.value == "completed" else None,
+    )
+
+
+@router.post("/requests/{request_id}/assessments/stream")
+async def create_assessment_stream(
+    request_id: UUID, body: AssessmentRequest, request: Request, actor_id: ActorId
+) -> Response:
+    """Stream progress text and persist only a fully validated final report."""
+    correlation_id = request.state.correlation_id
+    if request.app.state.settings.llm_mode != "auto":
+        return error_response(503, "ai_disabled", "AI assistance is not enabled.", correlation_id)
+    sessions = create_session_factory(request.app.state.database_engine)
+    try:
+        snapshot = capture_assessment_snapshot(
+            sessions,
+            reviewer_id=actor_id,
+            request_id=request_id,
+            expected_version=body.expected_version,
+        )
+    except OperationError as exc:
+        status = (
+            404 if exc.code == "request_not_found" else 409 if exc.code == "stale_version" else 403
+        )
+        return error_response(
+            status, exc.code, "Assessment cannot be generated for this request.", correlation_id
+        )
+    source = {
+        "request_id": str(snapshot.request_id),
+        "version_number": snapshot.version_number,
+        "discount_bps": snapshot.discount_bps,
+        "reason": snapshot.reason,
+        "context": snapshot.context,
+    }
+    settings = request.app.state.settings
+
+    async def events():
+        try:
+            async for event in stream_assessment(
+                base_url=str(settings.llm_base_url),
+                model=settings.llm_model,
+                timeout=settings.llm_timeout_seconds,
+                snapshot=source,
+            ):
+                if event["type"] == "delta":
+                    yield "event: delta\ndata: " + json.dumps(event["text"]) + "\n\n"
+                    continue
+                result = event["result"]
+                result_data = result.model_dump(mode="json") | _checklist_suggestion(
+                    snapshot.context
+                )
+                saved = store_assessment_if_current(
+                    sessions,
+                    reviewer_id=actor_id,
+                    snapshot=snapshot,
+                    model_identity=settings.llm_model,
+                    prompt_version=PROMPT_VERSION,
+                    result=result_data,
+                )
+                report = AssessmentResponse(
+                    assessment_id=saved.id,
+                    request_id=request_id,
+                    version_number=snapshot.version_number,
+                    status=saved.status.value,
+                    result=result_data if saved.status.value == "completed" else None,
+                )
+                metrics = event.get("metrics")
+                if isinstance(metrics, dict) and metrics:
+                    yield "event: metrics\ndata: " + json.dumps(metrics) + "\n\n"
+                yield "event: complete\ndata: " + report.model_dump_json() + "\n\n"
+        except AssessmentFailure as exc:
+            yield "event: error\ndata: " + json.dumps({"code": exc.code}) + "\n\n"
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

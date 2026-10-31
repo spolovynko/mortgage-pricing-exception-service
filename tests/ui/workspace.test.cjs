@@ -42,6 +42,40 @@ function form(id = "create-form", reference = "new", changes = {}) {
   return { id, dataset: { reference }, elements: { namedItem: (name) => fields[name] }, reportValidity: () => Object.values(fields).every((field) => !field.validityMessage), fields };
 }
 
+test("assessment report is rendered in a fixed readable text format", () => {
+  const page = workspace();
+  page.context.testAssessment = {
+    request_id: "request-a", version_number: 2, result: {
+      suggested_outcome: "suggest_do_not_approve", outcome_rationale: "Required checklist information is missing.",
+      summary: "Review the submitted context.", reported_claims: ["A claim"],
+      missing_information: [{ item: "Income evidence", reason: "Not provided" }], limitations: ["No external verification."],
+    },
+  };
+  const report = page.run("assessmentReportText(testAssessment)");
+  assert.match(report, /^AI ASSESSMENT REPORT/);
+  assert.match(report, /Suggested outcome: Suggest do not approve/);
+  assert.match(report, /REPORTED CLAIMS \(UNVERIFIED\)\n- A claim/);
+  assert.match(report, /MISSING INFORMATION TO REVIEW\n- Income evidence — Not provided/);
+  assert.match(report, /DECISION AUTHORITY/);
+});
+
+test("assessment preview streams readable text without exposing its JSON envelope", () => {
+  const page = workspace();
+  page.context.preview = page.run('assessmentStreamPreview("request-a", 1, \'{"summary":"Review the submitted terms\\ncarefully\')');
+  assert.match(page.context.preview, /SUMMARY\nReview the submitted terms\ncarefully/);
+  assert.match(page.context.preview, /REPORTED CLAIMS \(UNVERIFIED\)/);
+  assert.doesNotMatch(page.context.preview, /"summary"/);
+});
+
+test("assessment performance text distinguishes first text from model generation", () => {
+  const page = workspace();
+  page.context.performanceText = page.run('assessmentPerformanceText({startedAt:1000,firstTextAt:3500,completedAt:7500},{load_duration:1000000000,prompt_eval_duration:500000000,eval_duration:2000000000,eval_count:40})');
+  assert.match(page.context.performanceText, /First report text 2\.5s/);
+  assert.match(page.context.performanceText, /total 6\.5s/);
+  assert.match(page.context.performanceText, /model load 1\.0s/);
+  assert.match(page.context.performanceText, /generation 2\.0s \(40 tokens · 20\.0 tokens\/s\)/);
+});
+
 test("create draft survives view changes and reload without rendering narrative as HTML", () => {
   const page = workspace();
   page.context.testForm = form();

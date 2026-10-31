@@ -29,6 +29,97 @@ function getFormDraft(kind, reference = "new") {
   } catch { return null; }
 }
 
+function assessmentReportText(record) {
+  if (!record?.result) return "";
+  const result = record.result;
+  const list = (items) => items?.length ? items.map((item) => `- ${typeof item === "string" ? item : `${item.item} — ${item.reason}`}`).join("\n") : "- None listed";
+  return [
+    "AI ASSESSMENT REPORT",
+    `Request: ${record.request_id}`,
+    `Version: ${record.version_number}`,
+    `Suggested outcome: ${result.suggested_outcome === "suggest_approve" ? "Suggest approve" : result.suggested_outcome === "suggest_do_not_approve" ? "Suggest do not approve" : "No suggestion"}`,
+    `Checklist rationale: ${result.outcome_rationale || "Not provided"}`,
+    "",
+    "SUMMARY",
+    result.summary || "None provided",
+    "",
+    "REPORTED CLAIMS (UNVERIFIED)",
+    list(result.reported_claims),
+    "",
+    "MISSING INFORMATION TO REVIEW",
+    list(result.missing_information),
+    "",
+    "LIMITATIONS",
+    list(result.limitations),
+    "",
+    "DECISION AUTHORITY",
+    "Advisory only. Verify the submitted version. A human reviewer records the decision; this report does not change request status.",
+  ].join("\n");
+}
+
+function partialJsonString(raw, key) {
+  const marker = new RegExp(`"${key}"\\s*:\\s*"`).exec(raw);
+  if (!marker) return { text: "", complete: false };
+  let text = "";
+  for (let index = marker.index + marker[0].length; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (char === '"') return { text, complete: true };
+    if (char !== "\\") { text += char; continue; }
+    const escape = raw[index + 1];
+    if (!escape) break;
+    index += 1;
+    const escaped = { '"': '"', "\\": "\\", "/": "/", b: "\b", f: "\f", n: "\n", r: "\r", t: "\t" }[escape];
+    if (escaped !== undefined) text += escaped;
+    else if (escape === "u" && /^[\da-f]{4}$/i.test(raw.slice(index + 1, index + 5))) {
+      text += String.fromCharCode(parseInt(raw.slice(index + 1, index + 5), 16));
+      index += 4;
+    }
+  }
+  return { text, complete: false };
+}
+
+function assessmentStreamPreview(requestId, version, raw) {
+  const summary = partialJsonString(raw, "summary");
+  return [
+    "AI ASSESSMENT REPORT",
+    `Request: ${requestId}`,
+    `Version: ${version}`,
+    "Suggested outcome: Calculating from checklist fields…",
+    "Checklist rationale: Pending checklist evaluation.",
+    "",
+    "SUMMARY",
+    summary.text || "Waiting for the report text…",
+    "",
+    "REPORTED CLAIMS (UNVERIFIED)",
+    "Being prepared…",
+    "",
+    "MISSING INFORMATION TO REVIEW",
+    "Being prepared…",
+    "",
+    "LIMITATIONS",
+    "Being prepared…",
+    "",
+    "DECISION AUTHORITY",
+    "Advisory only. A human reviewer records the decision.",
+  ].join("\n");
+}
+
+function assessmentPerformanceText(timing, metrics) {
+  if (!timing) return "";
+  const seconds = (nanoseconds) => `${(nanoseconds / 1e9).toFixed(1)}s`;
+  const items = [];
+  if (timing.firstTextAt !== null) items.push(`First report text ${((timing.firstTextAt - timing.startedAt) / 1000).toFixed(1)}s`);
+  if (timing.completedAt !== null) items.push(`total ${((timing.completedAt - timing.startedAt) / 1000).toFixed(1)}s`);
+  if (metrics?.load_duration !== undefined) items.push(`model load ${seconds(metrics.load_duration)}`);
+  if (metrics?.prompt_eval_duration !== undefined) items.push(`prompt processing ${seconds(metrics.prompt_eval_duration)}`);
+  if (metrics?.eval_duration !== undefined) {
+    const tokens = metrics.eval_count || 0;
+    const rate = metrics.eval_duration ? ` · ${(tokens / (metrics.eval_duration / 1e9)).toFixed(1)} tokens/s` : "";
+    items.push(`generation ${seconds(metrics.eval_duration)} (${tokens} tokens${rate})`);
+  }
+  return items.join(" · ");
+}
+
 function saveFormDraft(form) {
   const values = {};
   for (const name of draftFields) {
@@ -198,7 +289,12 @@ function renderReview() {
   const own = detail && (detail.current_version.submitted_by_login === state.login || appFor(detail.application_id)?.manager_id === currentUser()?.id);
   const canDecide = detail?.status === "pending" && !own;
   const assessment = state.assessment?.result;
-  const aiPanel = detail && !own ? `<hr class="section-divider"><h3>Optional AI assistance</h3><p class="help">Local model assistance is optional. You can review and decide without installing or enabling it.</p><div class="button-row"><button class="button quiet" type="button" data-action="ai-toggle" aria-pressed="${state.aiEnabled}">${state.aiEnabled ? "Turn AI off" : "Turn AI on for this session"}</button><button class="button" type="button" data-action="generate-assessment" ${!state.aiEnabled || state.busy ? "disabled" : ""}>Generate assessment for v${detail.current_version.version_number}</button></div>${state.assessment?.status === "stale" ? '<div class="notice warning">The request changed during generation. This assessment is stale and hidden.</div>' : assessment ? `<div class="notice"><strong>Advisory summary · v${state.assessment.version_number}</strong><p>${escapeHtml(assessment.summary)}</p><p><strong>Reported claims (unverified)</strong></p><ul>${assessment.reported_claims.map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>None listed</li>"}</ul><p><strong>Missing information to review</strong></p><ul>${assessment.missing_information.map((item) => `<li>${escapeHtml(item.item)} — ${escapeHtml(item.reason)}</li>`).join("") || "<li>None listed</li>"}</ul><p>${assessment.limitations.map(escapeHtml).join(" ")}</p><p class="help">Advisory only. Check the submitted version yourself; no external evidence was verified.</p></div>` : ""}` : "";
+  const suggestion = assessment?.suggested_outcome === "suggest_approve" ? "Suggest approve" : assessment?.suggested_outcome === "suggest_do_not_approve" ? "Suggest do not approve" : "No suggestion in this earlier report; generate a fresh report.";
+  const streamingReport = state.busy
+    ? assessmentStreamPreview(detail.request_id, detail.current_version.version_number, state.assessmentStream)
+    : "";
+  const performanceText = assessmentPerformanceText(state.assessmentTiming, state.assessmentMetrics);
+  const aiPanel = detail && !own ? `<hr class="section-divider"><h3>Optional AI assistance</h3><p class="help">Local model assistance is optional. You can review and decide without installing or enabling it.</p><div class="button-row"><button class="button quiet" type="button" data-action="ai-toggle" aria-pressed="${state.aiEnabled}">${state.aiEnabled ? "Turn AI off" : "Turn AI on for this session"}</button><button class="button" type="button" data-action="generate-assessment" ${!state.aiEnabled || state.busy ? "disabled" : ""}>Generate report for v${detail.current_version.version_number}</button></div>${state.busy ? `<section class="notice ai-result" role="status" aria-live="polite"><strong>AI report · Streaming</strong><pre class="ai-report-text">${escapeHtml(streamingReport)}</pre><p class="help">${escapeHtml(performanceText || "Waiting for first model text…")}</p></section>` : ""}${state.assessment?.status === "stale" ? '<div class="notice warning" role="status">The request changed during generation. This assessment is stale and hidden.</div>' : assessment ? `<section class="notice ai-result" role="status" aria-live="polite"><div class="card-header"><h4>AI assessment report · Version ${state.assessment.version_number}</h4><button class="button small" type="button" data-action="copy-report">Copy report</button></div><pre class="ai-report-text">${escapeHtml(state.assessmentReport || assessmentReportText(state.assessment))}</pre>${performanceText ? `<p class="help">${escapeHtml(performanceText)}</p>` : ""}</section>` : ""}` : "";
   return `${pageHeading("Review queue", "Review the submitted terms and record a human decision.", '<button class="button" data-action="reload">Refresh queue</button>')}<div class="review-layout"><section class="card"><div class="card-header"><h2>Awaiting review</h2><span class="version-tag">${pending.length}</span></div>${pending.length ? listRequests(pending, state.selectedReviewId) : empty("New submissions will appear here.", "Queue is clear")}</section><section class="card">${detail ? detailFields(detail) : empty("Choose a pending request to see its submitted terms.", "Ready for your review")}${own ? '<div class="notice warning">You cannot review your own application or submission.</div>' : ""}${aiPanel}${canDecide ? `<hr class="section-divider"><h3>Decision on version ${detail.current_version.version_number}</h3><p class="help">Approval accepts the requested discount exactly. Editing terms requires a new version.</p><div class="button-row"><button class="button primary" data-action="decide" data-outcome="approved" ${state.busy ? "disabled" : ""}>Approve version ${detail.current_version.version_number}</button><button class="button danger" data-action="decide" data-outcome="declined" ${state.busy ? "disabled" : ""}>Decline version ${detail.current_version.version_number}</button></div>` : ""}${detail ? `<div class="button-row"><button class="button quiet" data-action="view-history" data-request="${escapeHtml(detail.request_id)}">View decision history</button></div>` : ""}</section></div>`;
 }
 

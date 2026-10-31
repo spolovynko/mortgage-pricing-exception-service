@@ -98,6 +98,19 @@ docker compose up --build --detach --wait
 
 Then open <http://127.0.0.1:8080/>. Startup applies database migrations and ensures the fictional demo records exist. Core mode runs without AI.
 
+#### Optional local AI assistance
+
+Reviewers can use the complete human workflow without installing Ollama or downloading a model. To explicitly enable the optional local model on Windows PowerShell, start the AI profile with:
+
+```powershell
+$env:LLM_MODE = 'auto'
+$env:LLM_BASE_URL = 'http://ollama:11434'
+$env:LLM_MODEL = 'qwen3:4b-instruct-2507-q4_K_M'
+docker compose --profile ai up --build
+```
+
+This downloads the selected model on first use and stores it in the persistent `model-cache` volume. Later starts reuse that cache. The app may start while setup is running; wait for `model-init` to report readiness before generating an assessment. A setup failure does not stop the core app or human review. Do not run `docker compose down --volumes` if you want to keep the downloaded model. The model and Ollama runtime are optional and are not included in the application image.
+
 To stop a Compose run while keeping its database, use `docker compose down`; restart it with `docker compose up --detach --wait`. For the local Python option, press Ctrl+C in the server terminal. The separate [troubleshooting and local-data guide](docs/troubleshooting.md) explains persistence and the destructive reset command.
 
 ### Use the application
